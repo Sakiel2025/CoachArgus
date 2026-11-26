@@ -10,7 +10,7 @@ CoachArgus 是我们团队共同开发的 [GoalScope 足球视频分析系统](h
 
 ## 团队成员
 
-- [汤宇飞（Sakiel2025）](https://github.com/Sakiel2025)
+- [Sakiel2025](https://github.com/Sakiel2025)
 - [EVANDRAUGHT](https://github.com/EVANDRAUGHT)
 - [karen17tkL](https://github.com/karen17tkL)
 
