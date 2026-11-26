@@ -1,0 +1,2564 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>足球知识图谱 · CoachArgus</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
+<!-- Three.js：主 CDN（BootCDN，国内稳定）→ 失败时自动切换 unpkg 备用 -->
+<script>
+(function(){
+  function loadScript(src, onOk, onErr){
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload = onOk;
+    s.onerror = onErr;
+    document.head.appendChild(s);
+  }
+  var primary   = 'https://cdn.bootcdn.net/ajax/libs/three.js/r128/three.min.js';
+  var fallback1 = 'https://unpkg.com/three@0.128.0/build/three.min.js';
+  var fallback2 = 'https://cdn.staticfile.org/three.js/r128/three.min.js';
+  loadScript(primary,
+    function(){ console.log('[Three.js] Loaded from BootCDN'); },
+    function(){
+      console.warn('[Three.js] BootCDN failed, trying unpkg...');
+      loadScript(fallback1,
+        function(){ console.log('[Three.js] Loaded from unpkg'); },
+        function(){
+          console.warn('[Three.js] unpkg failed, trying staticfile...');
+          loadScript(fallback2,
+            function(){ console.log('[Three.js] Loaded from staticfile'); },
+            function(){ console.error('[Three.js] All CDN sources failed'); }
+          );
+        }
+      );
+    }
+  );
+})();
+</script>
+<style>
+:root{
+  --bg:#060d1a;--card:rgba(12,24,48,0.92);--primary:#00ff88;--accent:#00d4ff;
+  --warn:#ffce56;--red:#ff6384;--orange:#ff7828;--purple:#a78bfa;
+  --border:rgba(0,255,136,0.15);--text:rgba(255,255,255,0.88);--dim:rgba(255,255,255,0.42)
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{height:100%}
+body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;overflow-x:hidden;display:flex;flex-direction:column}
+#bg-canvas{position:fixed;inset:0;pointer-events:none;z-index:0}
+
+/* ── Header ── */
+.header{position:sticky;top:0;z-index:50;background:rgba(6,13,26,0.97);backdrop-filter:blur(18px);
+  border-bottom:1px solid var(--border);padding:11px 20px;display:flex;align-items:center;gap:12px}
+.header-icon{width:38px;height:38px;border-radius:10px;
+  background:linear-gradient(135deg,rgba(0,255,136,0.18),rgba(0,212,255,0.12));
+  border:1px solid var(--border);display:flex;align-items:center;justify-content:center;
+  font-size:1.1rem;color:var(--primary);flex-shrink:0}
+.header-title{flex:1}
+.header-title h1{font-size:1rem;font-weight:700;color:#fff}
+.header-title p{font-size:0.7rem;color:var(--dim);margin-top:1px}
+.search-wrap{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.11);border-radius:22px;padding:6px 14px;width:220px;transition:border-color .2s}
+.search-wrap:focus-within{border-color:var(--primary)}
+.search-wrap input{background:none;border:none;outline:none;color:var(--text);font-size:0.84rem;flex:1}
+.search-wrap input::placeholder{color:var(--dim)}
+.search-wrap i{color:var(--dim);font-size:0.8rem}
+
+/* ── Cat bar ── */
+.cat-bar{position:sticky;top:60px;z-index:40;background:rgba(6,13,26,0.93);backdrop-filter:blur(12px);
+  border-bottom:1px solid rgba(255,255,255,0.05);padding:8px 20px;display:flex;gap:6px;
+  overflow-x:auto;scrollbar-width:none}
+.cat-bar::-webkit-scrollbar{display:none}
+.cat-btn{padding:5px 14px;border-radius:20px;cursor:pointer;font-size:0.78rem;font-weight:600;
+  white-space:nowrap;border:1px solid transparent;transition:all .2s;
+  background:rgba(255,255,255,0.05);color:var(--dim)}
+.cat-btn:hover{color:#fff;background:rgba(255,255,255,0.1)}
+.cat-btn.active{color:#060d1a;background:var(--primary);border-color:var(--primary)}
+
+/* ── Main layout ── 单一滚动容器，避免与 iframe 双滚动条 */
+.main{position:relative;z-index:1;padding:18px 20px;max-width:1440px;margin:0 auto;
+  flex:1;overflow-y:auto;overflow-x:hidden;}
+
+/* ── Graph section ── */
+.graph-wrap{background:var(--card);border:1px solid var(--border);border-radius:16px;
+  padding:16px;margin-bottom:22px;position:relative;overflow:hidden;box-sizing:border-box;}
+.graph-wrap.graph-hidden{display:none!important;}
+.graph-wrap::before{content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 25% 50%,rgba(0,255,136,0.05) 0%,transparent 55%),
+             radial-gradient(ellipse at 75% 30%,rgba(0,212,255,0.05) 0%,transparent 50%);
+  pointer-events:none}
+.graph-title{font-size:0.83rem;font-weight:700;color:var(--primary);
+  margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.graph-title span{font-size:.68rem;color:var(--dim);font-weight:400}
+#graph-canvas{width:100%;display:block;border-radius:10px;
+  background:rgba(0,0,0,0.28);cursor:grab;}
+#graph-canvas:active{cursor:grabbing}
+.graph-hint{font-size:0.68rem;color:var(--dim);margin-top:6px;text-align:center;}
+
+/* ── Cards ── */
+.section-hd{font-size:0.9rem;font-weight:700;color:#fff;margin-bottom:14px;
+  display:flex;align-items:center;gap:8px}
+.section-hd .badge{font-size:0.68rem;padding:2px 9px;border-radius:10px;
+  background:rgba(0,255,136,0.14);color:var(--primary);font-weight:600}
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-bottom:26px}
+.kcard{background:var(--card);border:1px solid rgba(255,255,255,0.07);border-radius:13px;
+  padding:15px 17px;cursor:pointer;transition:all .22s;position:relative;overflow:hidden}
+.kcard::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:var(--kc,var(--primary));border-radius:3px 3px 0 0;opacity:0;transition:opacity .2s}
+.kcard::after{content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at 50% 0%,var(--kc-glow,rgba(0,255,136,0.06)) 0%,transparent 65%);
+  opacity:0;transition:opacity .3s;pointer-events:none}
+.kcard:hover{transform:translateY(-3px);border-color:rgba(0,255,136,0.2);
+  box-shadow:0 8px 30px rgba(0,0,0,0.4),0 0 0 1px var(--kc,rgba(0,255,136,0.12))}
+.kcard:hover::before,.kcard:hover::after{opacity:1}
+.kcard-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:8px}
+.kcard-ico{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;
+  justify-content:center;font-size:0.92rem;flex-shrink:0}
+.kcard-name{font-size:0.92rem;font-weight:700;color:#fff;line-height:1.3}
+.kcard-en{font-size:0.68rem;color:var(--dim);margin-top:2px;font-style:italic}
+.kcard-desc{font-size:0.8rem;color:rgba(255,255,255,0.58);line-height:1.7}
+.kcard-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.tag{font-size:0.66rem;padding:2px 8px;border-radius:10px;border:1px solid;font-weight:500}
+.empty-tip{text-align:center;padding:60px 20px;color:var(--dim);font-size:0.86rem}
+.empty-tip i{font-size:1.8rem;display:block;margin-bottom:12px;opacity:.4}
+
+/* ── 3D Anim Demo ── */
+.anim3d-wrap{width:100%;height:320px;border-radius:12px;overflow:hidden;position:relative;
+  background:linear-gradient(160deg,#071428 0%,#0a1f10 100%);
+  border:1px solid rgba(0,255,136,0.18);margin-bottom:16px}
+.anim3d-wrap canvas{width:100%!important;height:100%!important;display:block}
+.anim3d-label{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
+  font-size:0.68rem;color:rgba(255,255,255,0.45);white-space:nowrap;pointer-events:none;
+  background:rgba(0,0,0,0.4);padding:2px 10px;border-radius:8px}
+.anim3d-badge{position:absolute;top:8px;right:10px;font-size:0.62rem;
+  background:rgba(0,255,136,0.12);color:var(--primary);border:1px solid rgba(0,255,136,0.2);
+  padding:2px 8px;border-radius:8px;pointer-events:none}
+.anim3d-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  color:rgba(255,255,255,0.3);font-size:0.8rem;gap:8px}
+
+/* ── Modal ── */
+.modal-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.7);
+  backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .22s}
+.modal-overlay.open{opacity:1;pointer-events:all}
+.modal-box{background:rgba(7,16,36,0.99);border:1px solid var(--border);border-radius:18px;
+  padding:28px 32px;max-width:680px;width:95%;max-height:88vh;overflow-y:auto;
+  position:relative;transform:translateY(16px) scale(.97);transition:transform .24s;
+  scrollbar-width:thin;scrollbar-color:rgba(0,255,136,0.2) transparent}
+.modal-overlay.open .modal-box{transform:none}
+.modal-close{position:absolute;top:14px;right:16px;background:rgba(255,255,255,0.07);
+  border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.5);font-size:.95rem;
+  width:30px;height:30px;border-radius:50%;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;transition:all .18s}
+.modal-close:hover{background:rgba(255,70,70,0.2);color:#fff}
+.modal-ico{width:50px;height:50px;border-radius:12px;display:flex;align-items:center;
+  justify-content:center;font-size:1.4rem;margin-bottom:14px}
+.modal-title{font-size:1.3rem;font-weight:800;color:#fff;margin-bottom:2px}
+.modal-en{font-size:0.78rem;color:var(--dim);font-style:italic;margin-bottom:13px}
+.msec{margin-bottom:14px}
+.msec-title{font-size:0.72rem;font-weight:700;color:var(--primary);letter-spacing:1px;
+  margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.msec-text{font-size:0.85rem;color:rgba(255,255,255,0.7);line-height:1.85}
+.mlist{padding-left:15px}
+.mlist li{font-size:0.83rem;color:rgba(255,255,255,0.66);line-height:1.95}
+.related-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:5px}
+.rchip{padding:5px 13px;border-radius:20px;font-size:0.76rem;font-weight:600;
+  background:rgba(0,255,136,0.08);color:var(--primary);border:1px solid rgba(0,255,136,0.2);
+  cursor:pointer;transition:all .17s}
+.rchip:hover{background:rgba(0,255,136,0.2)}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(0,255,136,0.2);border-radius:4px}
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+
+<div class="header">
+  <div class="header-icon"><i class="fas fa-project-diagram"></i></div>
+  <div class="header-title">
+    <h1>足球知识图谱</h1>
+    <p>Football Knowledge Graph · 为球迷而生的足球百科</p>
+  </div>
+  <div class="search-wrap">
+    <i class="fas fa-search"></i>
+    <input type="text" id="search-input" placeholder="搜索术语、位置、战术…" autocomplete="off">
+  </div>
+</div>
+
+<div class="cat-bar" id="cat-bar">
+  <div class="cat-btn active" data-cat="all">全部</div>
+  <div class="cat-btn" data-cat="position">⚽ 场上位置</div>
+  <div class="cat-btn" data-cat="tactics">♟ 战术阵型</div>
+  <div class="cat-btn" data-cat="skill">🎯 技术动作</div>
+  <div class="cat-btn" data-cat="rule">🏳 规则裁判</div>
+  <div class="cat-btn" data-cat="stats">📊 数据统计</div>
+  <div class="cat-btn" data-cat="event">🏆 赛事赛制</div>
+</div>
+
+<div class="main">
+  <div class="graph-wrap" id="graph-wrap">
+    <div class="graph-title">
+      <i class="fas fa-share-alt"></i> 知识关联图谱
+      <span>· 节点按相关性聚类 · 可拖动 · Ctrl+滚轮缩放 · 点击查看详情</span>
+    </div>
+    <canvas id="graph-canvas"></canvas>
+    <div class="graph-hint"><i class="fas fa-mouse-pointer"></i> 拖动节点 &nbsp;·&nbsp; Ctrl+滚轮缩放 &nbsp;·&nbsp; 点击查看详情</div>
+  </div>
+  <div id="cards-container"></div>
+</div>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal-box" id="modal-box">
+    <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════
+// 知识库
+// ════════════════════════════════════════════
+const KB = [
+  // ── 场上位置 ──
+  {id:'gk',cat:'position',name:'门将',en:'Goalkeeper (GK)',icon:'fas fa-hands',color:'#ffce56',bg:'rgba(255,206,86,0.14)',
+   short:'球队最后一道防线，唯一可在禁区内用手触球的球员。',
+   detail:'门将（GK）是球队最重要的保障，不仅要守好球门，现代足球中还需参与出球组织，具备精准脚法。',
+   points:['禁区内可用手触球，禁区外等同外场球员','脚下技术日益重要，常作"第一出球点"','需极强反应速度与空中判断能力','对1v1防守、角球站位有专项战术要求'],
+   related:['cb','penalty','offside'],tags:[{t:'防守',c:'#ff6384',b:'rgba(255,99,132,0.12)'}]},
+
+  {id:'cb',cat:'position',name:'中后卫',en:'Centre-Back (CB)',icon:'fas fa-shield-alt',color:'#ff6384',bg:'rgba(255,99,132,0.14)',
+   short:'防线核心，保护禁区、赢得空中对抗、阻止对方前锋。',
+   detail:'中后卫（CB）是防线最重要的位置，通常2-3名搭档出现。核心职责是保护禁区不失球、赢得空中球权，同时在现代足球中承担从后场发动进攻的能力。',
+   points:['空中对抗能力是核心素质','需提前预判进攻线路合理站位','现代足球中承担重要的出球职责','搭档分工：盯人+清道夫'],
+   related:['gk','dm','offside-trap','pressing'],tags:[{t:'防守',c:'#ff6384',b:'rgba(255,99,132,0.12)'}]},
+
+  {id:'lb',cat:'position',name:'边后卫',en:'Full-Back (LB/RB)',icon:'fas fa-arrows-alt-h',color:'#00d4ff',bg:'rgba(0,212,255,0.14)',
+   short:'防线两翼，兼顾防守与助攻上抢，现代足球最全面的位置之一。',
+   detail:'边后卫（LB/RB）既要盯防对方边锋，又要适时插上助攻。"内切边后卫"（Inverted Full-Back）等创新角色已成为现代足球趋势。',
+   points:['上下奔跑能力要求极高','内切边后卫：反脚内切参与中场组织','翼卫是其进攻升级版','需兼备1v1防守与下底传中技能'],
+   related:['cb','winger','formation-433'],tags:[{t:'防守',c:'#ff6384',b:'rgba(255,99,132,0.12)'},{t:'进攻',c:'#00ff88',b:'rgba(0,255,136,0.1)'}]},
+
+  {id:'dm',cat:'position',name:'防守型中场',en:'Defensive Midfielder (DM)',icon:'fas fa-anchor',color:'#00ff88',bg:'rgba(0,255,136,0.12)',
+   short:'"后腰"——拦截传球、保护防线、覆盖身前空当。',
+   detail:'防守型中场（DM）又称"后腰"，站于防线与组织核心之间，是球队的"灭火器"，负责拦截、覆盖身前空间，并快速转移球权。',
+   points:['站位意识极关键，需预判传球线路','对抗能力强，擅长抢断与卡位','"6号位"是常见别称','双后腰战术是4-4-2的经典配置'],
+   related:['cb','cm','pressing','formation-442'],tags:[{t:'防守',c:'#ff6384',b:'rgba(255,99,132,0.12)'},{t:'中场',c:'#ffce56',b:'rgba(255,206,86,0.12)'}]},
+
+  {id:'cm',cat:'position',name:'中场核心',en:'Central Midfielder (CM)',icon:'fas fa-cogs',color:'#ffce56',bg:'rgba(255,206,86,0.14)',
+   short:'球队发动机，控制节奏、连接防守与进攻的枢纽。',
+   detail:'中场核心（CM）是攻守转换枢纽，控制比赛节奏、分球组织、适时插上进攻。顶级中场兼具技术、视野、体能三重要素。',
+   points:['"8号位"常见别称','传球视野和第一触球质量是核心','盒子到盒子型中场兼顾攻守','进攻型中场（AM/10号）更靠近对方禁区'],
+   related:['dm','am','false9','tiki-taka'],tags:[{t:'中场',c:'#ffce56',b:'rgba(255,206,86,0.12)'},{t:'组织',c:'#00d4ff',b:'rgba(0,212,255,0.12)'}]},
+
+  {id:'am',cat:'position',name:'进攻型中场',en:'Attacking Midfielder (AM)',icon:'fas fa-magic',color:'#a78bfa',bg:'rgba(167,139,250,0.14)',
+   short:'"前腰"——创造力核心，制造机会与关键传球。',
+   detail:'进攻型中场（AM）俗称"前腰/10号位"，是进攻组织灵魂。任务是在前场接球、制造空间、完成关键传球或直接射门。梅西、齐达内、罗纳尔迪尼奥均是此位经典。',
+   points:['"10号球衣"是传统象征','常扮演"第二中锋"','需在压迫下控球分球','高位压迫战术流行后，纯前腰位置有所淡出'],
+   related:['cm','false9','through-ball','tiki-taka'],tags:[{t:'进攻',c:'#00ff88',b:'rgba(0,255,136,0.1)'},{t:'创造',c:'#a78bfa',b:'rgba(167,139,250,0.12)'}]},
+
+  {id:'winger',cat:'position',name:'边锋',en:'Winger (LW/RW)',icon:'fas fa-bolt',color:'#ff7828',bg:'rgba(255,120,40,0.14)',
+   short:'利用速度和技术突破边路，传中或内切射门。',
+   detail:'边锋（LW/RW）速度快，突破防守后传中或内切射门。现代"反脚边锋"（右脚打左路）成主流，内切射门成为致命武器。',
+   points:['传统边锋：下底传中为主','现代反脚边锋：内切射门（如罗本、萨拉赫）','高速反击中最危险的进攻兵器','一对一单刀能力是核心技能'],
+   related:['cf','lb','cross','counter-attack'],tags:[{t:'进攻',c:'#00ff88',b:'rgba(0,255,136,0.1)'},{t:'速度',c:'#ff7828',b:'rgba(255,120,40,0.12)'}]},
+
+  {id:'cf',cat:'position',name:'中锋',en:'Centre Forward (CF)',icon:'fas fa-crosshairs',color:'#00ff88',bg:'rgba(0,255,136,0.12)',
+   short:'"9号位"——球队进球机器，禁区内把握机会的核心。',
+   detail:'中锋（CF）是最靠近对方球门的球员，进球来源的核心。传统中锋强壮、头球好；"全能中锋"兼具回撤、助攻、背身控球等多重技能。',
+   points:['禁区内嗅觉是最重要特质','背身拿球、转身射门是核心技术','"9号球衣"传统属于中锋','假9号是颠覆传统中锋的战术创新'],
+   related:['false9','am','penalty','header'],tags:[{t:'进攻',c:'#00ff88',b:'rgba(0,255,136,0.1)'},{t:'射门',c:'#ff6384',b:'rgba(255,99,132,0.12)'}]},
+
+  {id:'false9',cat:'position',name:'假9号',en:'False 9',icon:'fas fa-user-secret',color:'#00d4ff',bg:'rgba(0,212,255,0.14)',
+   short:'形似中锋却大量回撤，诱使后卫跟出制造身后空间。',
+   detail:'假9号是一种战术角色，前锋频繁回撤至中场接球，诱使对方中后卫跟出，为身后插上的中场或边锋制造空间。2009年巴塞罗那梅西是历史最经典案例。',
+   points:['核心：让对方后卫陷入"跟或不跟"两难','代表球员：梅西（巴萨）','需极强传球视野和控球能力','常与"无锋阵"或高位压迫配合'],
+   related:['cf','am','tiki-taka','formation-433'],tags:[{t:'战术',c:'#a78bfa',b:'rgba(167,139,250,0.12)'},{t:'进攻',c:'#00ff88',b:'rgba(0,255,136,0.1)'}]},
+
+  // ── 战术阵型 ──
+  {id:'formation-442',cat:'tactics',name:'4-4-2 阵型',en:'Formation 4-4-2',icon:'fas fa-th',color:'#ff7828',bg:'rgba(255,120,40,0.13)',
+   short:'经典双中锋阵型，攻守均衡，英式足球的标志性打法。',
+   detail:'4-4-2 是足球史上最经典阵型之一，采用4后卫+4中场+2前锋。攻守均衡、结构稳定，是英格兰传统足球代名词。',
+   points:['双中锋可形成高中锋+影子前锋组合','中场4人组强调覆盖宽度','边中场需大量上下奔跑','缺点：面对4-3-3时中场人数劣势'],
+   related:['formation-433','dm','counter-attack'],tags:[{t:'均衡',c:'#00d4ff',b:'rgba(0,212,255,0.12)'},{t:'经典',c:'#ffce56',b:'rgba(255,206,86,0.12)'}]},
+
+  {id:'formation-433',cat:'tactics',name:'4-3-3 阵型',en:'Formation 4-3-3',icon:'fas fa-project-diagram',color:'#00ff88',bg:'rgba(0,255,136,0.12)',
+   short:'三中场控制节奏，双边锋威胁宽度，现代传控足球典型阵型。',
+   detail:'4-3-3 是现代足球最流行阵型之一，巴塞罗那和荷兰国家队是最佳诠释者。注重控球和高位压迫，要求所有球员技术全面。',
+   points:['三中场可配置1后腰+2进攻中场或均衡型','高位压迫时三前锋是第一道防线','边后卫助攻填补宽度','对体能消耗极大'],
+   related:['pressing','tiki-taka','false9','winger'],tags:[{t:'控球',c:'#00ff88',b:'rgba(0,255,136,0.1)'},{t:'主流',c:'#00d4ff',b:'rgba(0,212,255,0.12)'}]},
+
+  {id:'formation-352',cat:'tactics',name:'3-5-2 阵型',en:'Formation 3-5-2',icon:'fas fa-bars',color:'#a78bfa',bg:'rgba(167,139,250,0.14)',
+   short:'三中卫防守厚实，翼卫攻守两用，意式链式防守传统。',
+   detail:'3-5-2 使用三名中后卫+五中场（含2名翼卫）+双前锋。翼卫是关键，需覆盖整条边路的攻防。意大利传统孕育了此阵型多种变体。',
+   points:['翼卫体能要求极高，是成败关键','三中卫对阵单前锋可形成局部优势','切换为5-3-2防守时极为厚重','意大利国家队3-4-2-1变体夺多项冠军'],
+   related:['lb','cb','counter-attack'],tags:[{t:'防守',c:'#ff6384',b:'rgba(255,99,132,0.12)'},{t:'变阵',c:'#a78bfa',b:'rgba(167,139,250,0.12)'}]},
+
+  {id:'pressing',cat:'tactics',name:'高位压迫',en:'High Press / Gegenpressing',icon:'fas fa-compress-arrows-alt',color:'#ff6384',bg:'rgba(255,99,132,0.14)',
+   short:'在对方半场主动施压断球，克洛普的标志性战术。',
+   detail:'高位压迫是失球后立即就地反抢，或主动上前逼迫对方犯错的防守策略。克洛普的"反压迫"（Gegenpressing）是最极致形态：失球瞬间5秒内就地围抢。',
+   points:['核心：失球后最佳夺球时机是对方刚拿到球','需全队同步跑动，体能消耗极大','前场高压可减少后卫防守压力','代表教练：克洛普、瓜迪奥拉、图赫尔'],
+   related:['formation-433','dm','tiki-taka'],tags:[{t:'防守',c:'#ff6384',b:'rgba(255,99,132,0.12)'},{t:'战术',c:'#a78bfa',b:'rgba(167,139,250,0.12)'}]},
+
+  {id:'tiki-taka',cat:'tactics',name:'Tiki-Taka',en:'Tiki-Taka',icon:'fas fa-exchange-alt',color:'#00d4ff',bg:'rgba(0,212,255,0.14)',
+   short:'小范围快速传球控球哲学，巴萨与西班牙的巅峰诠释。',
+   detail:'Tiki-Taka 以大量短传、快速移动和控球为核心，在瓜迪奥拉执教巴萨与西班牙时期（2008-2012）达到巅峰。核心思想：控制皮球就是控制比赛。',
+   points:['平均传球距离极短（8-12米）','无球球员的跑位比有球技术更重要','通过控球使对手疲劳','2010世界杯、2008/2012欧洲杯西班牙夺冠核心'],
+   related:['cm','false9','pressing','formation-433'],tags:[{t:'传控',c:'#00d4ff',b:'rgba(0,212,255,0.12)'},{t:'战术',c:'#a78bfa',b:'rgba(167,139,250,0.12)'}]},
+
+  {id:'counter-attack',cat:'tactics',name:'快速反击',en:'Counter Attack',icon:'fas fa-fighter-jet',color:'#ffce56',bg:'rgba(255,206,86,0.13)',
+   short:'防守后快速利用对方压上的空当，闪电进攻直扑球门。',
+   detail:'快速反击以防守为起点，利用对方进攻时身后空间发动闪电攻势。成功反击依赖快速第一传、速度出众的边锋/前锋，和把握瞬间机会的能力。',
+   points:['"低位防守+快速反击"是以弱胜强经典策略','传球次数越少越直接越致命','边锋速度是反击质量决定性因素','5v4、3v2是理想反击形式'],
+   related:['winger','formation-442','pressing'],tags:[{t:'进攻',c:'#00ff88',b:'rgba(0,255,136,0.1)'},{t:'战术',c:'#a78bfa',b:'rgba(167,139,250,0.12)'}]},
+
+  {id:'offside-trap',cat:'tactics',name:'越位陷阱',en:'Offside Trap',icon:'fas fa-sign',color:'#ff6384',bg:'rgba(255,99,132,0.13)',
+   short:'防线整体上提让对方前锋越位，化解进攻威胁。',
+   detail:'越位陷阱是后卫线在传球瞬间整体向前移动，让接球对方球员越位的防守战术，依赖后卫线的高度默契与精准时机。阿森纳"后卫四杰"是经典案例。',
+   points:['需后卫线4人高度同步','VAR时代越位判罚更精准，风险提升','与高位防守线配合效果最佳','对跑位精妙的前锋存在较大风险'],
+   related:['offside','cb','pressing'],tags:[{t:'防守',c:'#ff6384',b:'rgba(255,99,132,0.12)'},{t:'战术',c:'#a78bfa',b:'rgba(167,139,250,0.12)'}]},
+
+  // ── 技术动作 ──
+  {id:'dribble',cat:'skill',name:'盘带过人',en:'Dribbling',icon:'fas fa-running',color:'#00ff88',bg:'rgba(0,255,136,0.12)',
+   short:'控球状态下利用技巧和速度突破防守，最具观赏性的个人技术。',
+   detail:'盘带过人是足球中最具观赏性的个人技术，通过变向、变速、虚晃等手段绕过防守球员，是梅西、C罗、内马尔等超级球星的核心武器。',
+   points:['单步切入：脚外/内侧快速一步跨过','马赛回旋：360度转体完成过人','"牛尾巴"等招式是足球文化一部分','速度过人在现代足球中同样高效'],
+   related:['winger','counter-attack'],tags:[{t:'技术',c:'#00d4ff',b:'rgba(0,212,255,0.12)'},{t:'个人能力',c:'#a78bfa',b:'rgba(167,139,250,0.12)'}]},
+
+  {id:'cross',cat:'skill',name:'传中',en:'Cross',icon:'fas fa-paper-plane',color:'#ff7828',bg:'rgba(255,120,40,0.13)',
+   short:'从边路向禁区内传球，为中路球员创造射门机会。',
+   detail:'传中（Cross）是边路球员下底或切入后向对方禁区传球，目的是为中路前锋或插上球员创造射门机会。质量取决于落点精准性、时机选择和传球弧度。',
+   points:['下底传中：贴近底线后传入小禁区前沿','回传：超越底线后横向回传禁区中路','低平球传中：直接传入脚下，速度快','传中角度、速度和落点三要素决定威胁'],
+   related:['lb','winger','cf','corner'],tags:[{t:'进攻',c:'#00ff88',b:'rgba(0,255,136,0.1)'},{t:'边路',c:'#ff7828',b:'rgba(255,120,40,0.12)'}]},
+
+  {id:'through-ball',cat:'skill',name:'直塞球',en:'Through Ball',icon:'fas fa-location-arrow',color:'#00d4ff',bg:'rgba(0,212,255,0.14)',
+   short:'穿透防线直接为跑位球员创造单刀机会的精准传球。',
+   detail:'直塞球将球精准传入防守线身后，供己方球员跑动接应。要求传球者具备精准技术和提前看穿跑位路线的视野，同时接球者需要恰到好处的跑位时机。',
+   points:['传球时机：接球者跑位"刚好越位线前一步"','传球路线：避开防守球员的拦截站位','VAR时代越位判罚更精准','伊涅斯塔、皮尔洛等大师的标志性绝活'],
+   related:['offside','am','false9'],tags:[{t:'传球',c:'#00d4ff',b:'rgba(0,212,255,0.12)'},{t:'进攻',c:'#00ff88',b:'rgba(0,255,136,0.1)'}]},
+
+  {id:'header',cat:'skill',name:'头球',en:'Header',icon:'fas fa-hard-hat',color:'#ffce56',bg:'rgba(255,206,86,0.13)',
+   short:'用头部接触、控制或攻击球，定位球和传中的核心技术。',
+   detail:'头球分进攻性（攻门、传球）和防守性（解围）。出色头球需要精准时机判断、弹跳能力、颈部发力控制和身体对抗能力。C罗的滞空头球是世界顶级水平代表。',
+   points:['进攻头球：额头正中发力，向下俯冲最致命','防守头球：大力清远，避免在危险区传给对方','空中对抗：合理卡位争制空权','角球、任意球中的核心技术'],
+   related:['corner','cf','cb'],tags:[{t:'技术',c:'#00d4ff',b:'rgba(0,212,255,0.12)'},{t:'对抗',c:'#ff6384',b:'rgba(255,99,132,0.12)'}]},
+
+  {id:'tackle',cat:'skill',name:'铲球',en:'Tackle',icon:'fas fa-shoe-prints',color:'#ff6384',bg:'rgba(255,99,132,0.13)',
+   short:'用脚将球从对方球员脚下铲夺的防守技术。',
+   detail:'铲球是防守球员主动出脚争抢持球对手的技术，分正面铲球和站立铲球。铲球需要精准时机和角度，从背后铲球可能导致犯规甚至红牌。',
+   points:['站立铲球：两脚站立，脚掌内侧顶球','飞铲/滑铲：单腿滑地，覆盖范围更大但风险高','背后铲球属严重犯规','精准铲断后快速转换进攻是防守反击起点'],
+   related:['cb','dm','pressing','foul'],tags:[{t:'防守',c:'#ff6384',b:'rgba(255,99,132,0.12)'},{t:'技术',c:'#00d4ff',b:'rgba(0,212,255,0.12)'}]},
+
+  // ── 规则裁判 ──
+  {id:'offside',cat:'rule',name:'越位规则',en:'Offside Rule',icon:'fas fa-flag',color:'#ff6384',bg:'rgba(255,99,132,0.13)',
+   short:'传球瞬间进攻球员身体超过对方倒数第二名球员即为越位。',
+   detail:'越位规则规定：传球瞬间，进攻球员身体参与比赛的部分（不含手臂）比对方倒数第二名球员更靠近对方球门，则处于越位位置。在此位置接球参与进攻被判越位。',
+   points:['"传球瞬间"是判断的关键时间节点，非接球时','VAR通过逐帧分析使判罚精确到毫米','手臂不算越位判断部位（2019年修订）','接界外球、角球、球门球时无越位'],
+   related:['var','offside-trap','through-ball'],tags:[{t:'规则',c:'#ffce56',b:'rgba(255,206,86,0.12)'},{t:'判罚',c:'#ff6384',b:'rgba(255,99,132,0.12)'}]},
+
+  {id:'var',cat:'rule',name:'VAR 视频助理裁判',en:'Video Assistant Referee',icon:'fas fa-video',color:'#00d4ff',bg:'rgba(0,212,255,0.14)',
+   short:'通过视频回放辅助裁判对关键事件作出准确判决。',
+   detail:'VAR 于2018年世界杯正式大规模启用，是足球规则史上最重大的技术革命。对四类事件进行复核：进球有效性、点球判罚、直接红牌和球员身份错认。',
+   points:['可复核：进球(越位/手球)、点球、直接红牌、身份误判','"明显错误"是干预标准，争议性判罚不干预','半自动越位系统（SAOT）进一步提升精确度','争议：过多中断比赛，部分合理进球被否定'],
+   related:['offside','penalty','handball'],tags:[{t:'科技',c:'#00d4ff',b:'rgba(0,212,255,0.12)'},{t:'规则',c:'#ffce56',b:'rgba(255,206,86,0.12)'}]},
+
+  {id:'penalty',cat:'rule',name:'点球',en:'Penalty Kick',icon:'fas fa-bullseye',color:'#ff7828',bg:'rgba(255,120,40,0.13)',
+   short:'禁区内犯规后，在12码点上的直接射门机会。',
+   detail:'点球是防守方在己方禁区内犯规时，进攻方获得的在罚球点（约10.97米）直接射门机会。也是点球大战的核心规则。',
+   points:['点球命中率约75%','主罚前心理博弈：方向预判 vs 打法选择','"帕嫩卡"轻挑是心理博弈的极致体现','点球大战：各5球，再平后均同步击球'],
+   related:['var','gk','foul'],tags:[{t:'规则',c:'#ffce56',b:'rgba(255,206,86,0.12)'},{t:'射门',c:'#ff6384',b:'rgba(255,99,132,0.12)'}]},
+
+  {id:'foul',cat:'rule',name:'犯规与卡牌',en:'Foul & Cards',icon:'fas fa-stop',color:'#ffce56',bg:'rgba(255,206,86,0.14)',
+   short:'犯规分类与黄牌、红牌判罚标准，观赛必备基础知识。',
+   detail:'犯规指球员以规则不允许的方式抢断、拉拽、推搡对方，或用手球防守进攻。裁判根据严重程度给予黄牌（警告）或红牌（罚出场）。',
+   points:['黄牌：恶意犯规、故意手球、拖延时间','红牌：严重犯规、暴力行为、破坏明显进球机会(DOGSO)','累计两张黄牌自动转为红牌','累计5张黄牌停赛（各联赛规则不同）'],
+   related:['var','penalty','tackle'],tags:[{t:'规则',c:'#ffce56',b:'rgba(255,206,86,0.12)'},{t:'裁判',c:'#ff6384',b:'rgba(255,99,132,0.12)'}]},
+
+  {id:'corner',cat:'rule',name:'角球',en:'Corner Kick',icon:'fas fa-flag-checkered',color:'#00ff88',bg:'rgba(0,255,136,0.12)',
+   short:'防守方踢出底线后，进攻方在角旗处发出的定位球。',
+   detail:'角球是当防守球员最后触球后球越出底线时，进攻方在角旗弧内发出的定位球。是重要进攻机会，顶级联赛约10%进球来自角球。',
+   points:['近点角球（In-Swinger）：弧线弯入，适合前点头球','外旋角球（Out-Swinger）：向外，适合后点中锋头球','短角球：传给近点球员二次进攻','近10%顶级联赛进球来自角球'],
+   related:['header','cf','cb'],tags:[{t:'定位球',c:'#00d4ff',b:'rgba(0,212,255,0.12)'},{t:'进攻',c:'#00ff88',b:'rgba(0,255,136,0.1)'}]},
+
+  {id:'handball',cat:'rule',name:'手球',en:'Handball',icon:'fas fa-hand-paper',color:'#ff6384',bg:'rgba(255,99,132,0.13)',
+   short:'球员用手臂触球的违规行为，规则近年经历重大修订。',
+   detail:'现行手球规则区分"有意"和"无意"：有意用手臂触球几乎必判；无意情况下，若球打到"不自然扩大的手臂"上也可能被判手球。',
+   points:['2019年修订：手臂高于肩膀触球基本判手球','倒地时手臂撑地支撑身体不计','攻方手球：对方获任意球；禁区内：对方获点球','VAR引入后手球争议判罚增多'],
+   related:['var','penalty','foul'],tags:[{t:'规则',c:'#ffce56',b:'rgba(255,206,86,0.12)'},{t:'判罚',c:'#ff6384',b:'rgba(255,99,132,0.12)'}]},
+
+  // ── 数据统计 ──
+  {id:'xg',cat:'stats',name:'预期进球 xG',en:'Expected Goals (xG)',icon:'fas fa-chart-line',color:'#00ff88',bg:'rgba(0,255,136,0.12)',
+   short:'量化每次射门机会的进球概率，现代足球数据分析的核心指标。',
+   detail:'xG（Expected Goals）表示某次射门基于历史数据理论上进球的概率（0~1）。综合考虑距离、角度、射门方式等因素。全场累计xG与实际比分差距揭示"运气"成分。',
+   points:['点球xG约0.76，大空门约0.9，长射约0.02','xG>实际进球：运气差或门将超常','xG<实际进球：依赖临场，长期难持续','延伸指标：xA（预期助攻）、npxG（不含点球）'],
+   related:['possession','shot-on-target'],tags:[{t:'数据',c:'#00d4ff',b:'rgba(0,212,255,0.12)'},{t:'进攻',c:'#00ff88',b:'rgba(0,255,136,0.1)'}]},
+
+  {id:'possession',cat:'stats',name:'控球率',en:'Ball Possession',icon:'fas fa-circle',color:'#00d4ff',bg:'rgba(0,212,255,0.14)',
+   short:'双方球队各自控球时间占比，直观反映比赛主动权。',
+   detail:'控球率是最直观的足球统计指标之一，表示某队持球时间占比。高控球率通常反映更多主动权，但不直接等于获胜优势——强大反击型球队往往以低控球率赢球。',
+   points:['顶级控球型球队常维持70%+控球率','控球率≠进攻质量，需结合xG综合分析','"有效控球"指进展至对方半场的控球','55%以上控球率通常被认为具有明显优势'],
+   related:['xg','tiki-taka','pressing'],tags:[{t:'数据',c:'#00d4ff',b:'rgba(0,212,255,0.12)'},{t:'战术',c:'#a78bfa',b:'rgba(167,139,250,0.12)'}]},
+
+  {id:'shot-on-target',cat:'stats',name:'射正率',en:'Shots on Target',icon:'fas fa-dot-circle',color:'#ff7828',bg:'rgba(255,120,40,0.13)',
+   short:'射门中打在门框范围内（含被扑出）的比例。',
+   detail:'射正是指射门落点在球门框范围内的次数。射正率（射正/总射门）是衡量射手把握机会能力的重要指标。',
+   points:['顶级射手射正率通常45%以上','射正被扑出：反映门将贡献或射门质量','与xG结合：高xG+低射正率→临场状态差','每场射正4+次通常意味着较强进球可能'],
+   related:['xg','cf','gk'],tags:[{t:'数据',c:'#00d4ff',b:'rgba(0,212,255,0.12)'},{t:'进攻',c:'#00ff88',b:'rgba(0,255,136,0.1)'}]},
+
+  {id:'heatmap',cat:'stats',name:'热力图',en:'Heatmap',icon:'fas fa-fire',color:'#ff6384',bg:'rgba(255,99,132,0.13)',
+   short:'可视化球员活动频率分布，揭示其习惯移动区域。',
+   detail:'热力图通过颜色深浅展示球员在场上各区域的活动密度，能直观反映球员的习惯活动区域、阵型宽度与深度，以及全队的压迫站位倾向。',
+   points:['边锋热力图：两端（边路突破+内切射门）密集','中锋热力图：对方禁区内密集','防守型中场：己方半场中路密集','CoachArgus系统可自动生成主客队热力图'],
+   related:['possession','xg','pressing'],tags:[{t:'数据',c:'#00d4ff',b:'rgba(0,212,255,0.12)'},{t:'可视化',c:'#a78bfa',b:'rgba(167,139,250,0.12)'}]},
+
+  // ── 赛事赛制 ──
+  {id:'cl',cat:'event',name:'欧冠联赛',en:'UEFA Champions League',icon:'fas fa-star',color:'#ffce56',bg:'rgba(255,206,86,0.14)',
+   short:'欧洲最高水平俱乐部赛事，"大耳杯"是最高荣誉。',
+   detail:'欧洲冠军联赛（UEFA Champions League）由欧足联主办。2024/25赛季起改为"联赛阶段+淘汰赛"新赛制，36支球队参与联赛阶段，积分前8直接晋级16强。',
+   points:['"大耳杯"是欧冠冠军奖杯俗称','皇马历史夺冠次数最多（15次）','2024/25赛季采用全新联赛制','决赛地点提前3年公布，全球最大单场赛事'],
+   related:['worldcup','var','penalty'],tags:[{t:'欧洲',c:'#ffce56',b:'rgba(255,206,86,0.12)'},{t:'顶级',c:'#00ff88',b:'rgba(0,255,136,0.1)'}]},
+
+  {id:'worldcup',cat:'event',name:'FIFA 世界杯',en:'FIFA World Cup',icon:'fas fa-globe',color:'#00ff88',bg:'rgba(0,255,136,0.12)',
+   short:'四年一届的全球最高级别足球赛事，每个球员梦寐以求的荣耀。',
+   detail:'FIFA 世界杯每四年举办一次，是世界上观众最多的单项体育赛事。2026年起扩军至48支球队参赛。巴西5次夺冠是历史最多。',
+   points:['2026年世界杯在美国、加拿大、墨西哥联合举办','48支球队制：12小组各4队','巴西5次>德意各4次','世界杯决赛全球超10亿观众'],
+   related:['cl','var','penalty'],tags:[{t:'全球',c:'#00ff88',b:'rgba(0,255,136,0.1)'},{t:'顶级',c:'#ffce56',b:'rgba(255,206,86,0.12)'}]},
+
+  {id:'relegation',cat:'event',name:'升降级制度',en:'Promotion & Relegation',icon:'fas fa-arrows-alt-v',color:'#ff6384',bg:'rgba(255,99,132,0.13)',
+   short:'联赛末名降级，低级联赛冠亚军升级，保证足球联赛竞争活力。',
+   detail:'升降级制度是大多数欧洲足球联赛的核心竞争机制：每赛季积分垫底的若干球队降入下一级别，同时下级联赛前几名升入顶级联赛。这一制度让每场比赛都充满意义。',
+   points:['英超：每赛季末3支降入英冠','"降级集团"：积分在降级线附近挣扎的球队','升降级附加赛：排名3-6的球队抢最后升级名额','降级意味着广告收入、转播费、球星流失的连锁反应'],
+   related:['cl','worldcup'],tags:[{t:'赛制',c:'#00d4ff',b:'rgba(0,212,255,0.12)'},{t:'联赛',c:'#ffce56',b:'rgba(255,206,86,0.12)'}]}
+];
+
+const ID_MAP = {};
+KB.forEach(k => ID_MAP[k.id] = k);
+const CAT_NAMES = {position:'场上位置',tactics:'战术阵型',skill:'技术动作',rule:'规则裁判',stats:'数据统计',event:'赛事赛制'};
+
+// ════════════════════════════════════════════
+// 背景粒子
+// ════════════════════════════════════════════
+(function(){
+  const c = document.getElementById('bg-canvas'), ctx = c.getContext('2d');
+  let W, H, pts = [];
+  function resize(){ W = c.width = window.innerWidth; H = c.height = window.innerHeight; }
+  resize(); window.addEventListener('resize', resize);
+  for(let i = 0; i < 60; i++){
+    pts.push({
+      x: Math.random()*1920, y: Math.random()*1080,
+      r: Math.random()*1.5+0.3,
+      vx: (Math.random()-.5)*.18, vy: (Math.random()-.5)*.18,
+      a: Math.random()*.25+.06,
+      hue: Math.random() < .6 ? 136 : (Math.random() < .5 ? 190 : 50)
+    });
+  }
+  (function draw(){
+    ctx.clearRect(0,0,W,H);
+    pts.forEach(p => {
+      p.x += p.vx; p.y += p.vy;
+      if(p.x<0)p.x=W; if(p.x>W)p.x=0; if(p.y<0)p.y=H; if(p.y>H)p.y=0;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle = p.hue===136 ? `rgba(0,255,136,${p.a})`
+                    : p.hue===190 ? `rgba(0,212,255,${p.a})`
+                    : `rgba(255,206,86,${p.a*0.6})`;
+      ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  })();
+})();
+
+// ════════════════════════════════════════════
+// 知识关联图谱（动态飘动 + 发光连线 + 聚类布局）
+// ════════════════════════════════════════════
+(function(){
+  const canvas = document.getElementById('graph-canvas');
+  const ctx = canvas.getContext('2d');
+  const graphWrap = document.getElementById('graph-wrap');
+
+  // ── 动态设置图谱高度：填满页面剩余可视区域 ──
+  function resizeGraphWrap() {
+    const header = document.querySelector('.header');
+    const catBar = document.querySelector('.cat-bar');
+    const headerH = header ? header.offsetHeight : 60;
+    const catH    = catBar  ? catBar.offsetHeight  : 44;
+    const titleEl = graphWrap.querySelector('.graph-title');
+    const hintEl  = graphWrap.querySelector('.graph-hint');
+    const titleH  = titleEl ? titleEl.offsetHeight + 10 : 44;
+    const hintH   = hintEl  ? hintEl.offsetHeight  + 6  : 28;
+    const mainPad = 18 * 2;
+    const wrapPad = 16 * 2;
+    const wrapMgn = 22;
+    const canvasH = Math.max(340, window.innerHeight - headerH - catH - mainPad - wrapPad - titleH - hintH - wrapMgn - 8);
+    // 设置 canvas 的 CSS height，让浏览器重新布局后 offsetHeight 会更新
+    canvas.style.height = canvasH + 'px';
+  }
+  resizeGraphWrap();
+  window.addEventListener('resize', () => { resizeGraphWrap(); requestAnimationFrame(layout); });
+
+  // 节点定义（含聚类分组）
+  const NODES = [
+    // 防守组 (左区)
+    {id:'gk',    label:'门将',      color:'#ffce56', cluster:0},
+    {id:'cb',    label:'中后卫',    color:'#ff6384', cluster:0},
+    {id:'lb',    label:'边后卫',    color:'#00d4ff', cluster:0},
+    {id:'dm',    label:'后腰',      color:'#00ff88', cluster:0},
+    {id:'offside-trap',label:'越位陷阱',color:'#ff6384',cluster:0},
+    // 中场组 (中区)
+    {id:'cm',    label:'中场核心',  color:'#ffce56', cluster:1},
+    {id:'am',    label:'前腰',      color:'#a78bfa', cluster:1},
+    {id:'pressing', label:'高压迫',   color:'#ff6384', cluster:1},
+    {id:'tiki-taka',label:'Tiki-Taka',color:'#00d4ff',cluster:1},
+    {id:'formation-433',label:'4-3-3',color:'#00ff88',cluster:1},
+    // 进攻组 (右区)
+    {id:'winger',label:'边锋',      color:'#ff7828', cluster:2},
+    {id:'cf',    label:'中锋',      color:'#00ff88', cluster:2},
+    {id:'false9',label:'假9号',     color:'#00d4ff', cluster:2},
+    {id:'counter-attack',label:'快反击',color:'#ffce56',cluster:2},
+    {id:'formation-442',label:'4-4-2',color:'#ff7828',cluster:2},
+    // 规则/数据组 (下区)
+    {id:'offside',label:'越位规则', color:'#ff6384', cluster:3},
+    {id:'var',   label:'VAR',       color:'#00d4ff', cluster:3},
+    {id:'penalty',label:'点球',     color:'#ff7828', cluster:3},
+    {id:'xg',    label:'xG',        color:'#00ff88', cluster:3},
+    {id:'possession',label:'控球率',color:'#00d4ff', cluster:3},
+    {id:'cl',    label:'欧冠',      color:'#ffce56', cluster:3},
+  ];
+
+  const EDGES = [
+    ['gk','cb'],['cb','lb'],['lb','dm'],['dm','cm'],['cm','am'],['am','cf'],['cf','false9'],
+    ['am','winger'],['winger','cf'],['pressing','dm'],['pressing','cm'],
+    ['tiki-taka','cm'],['tiki-taka','am'],['tiki-taka','false9'],
+    ['counter-attack','winger'],['counter-attack','cf'],
+    ['xg','cf'],['xg','am'],['offside','cb'],['offside','var'],
+    ['var','cl'],['false9','am'],['dm','cb'],['lb','winger'],
+    ['formation-433','pressing'],['formation-442','counter-attack'],
+    ['offside-trap','cb'],['offside-trap','offside'],
+    ['possession','tiki-taka'],['possession','pressing'],
+    ['penalty','gk'],['penalty','var'],
+  ];
+
+  // 聚类中心（相对比例，运行时乘以画布尺寸）
+  const CLUSTER_POS = [
+    {rx:0.18, ry:0.38},  // 0 防守（左上）
+    {rx:0.50, ry:0.26},  // 1 中场（中上）
+    {rx:0.82, ry:0.38},  // 2 进攻（右上）
+    {rx:0.50, ry:0.74},  // 3 规则/数据（中下）
+  ];
+
+  let W = 0, H = 0;
+  let dragging = null, dragMoved = false, hovered = null;
+  let scale = 1, ox = 0, oy = 0;
+  let panning = false, lmx = 0, lmy = 0, panMoved = false;
+  let tick = 0;
+  let initialized = false;
+
+  // 节点飘动偏移（每个节点独立相位）
+  NODES.forEach((n, i) => {
+    n.floatPhase  = Math.random() * Math.PI * 2;
+    n.floatSpeed  = 0.0008 + Math.random() * 0.0006;
+    n.floatAmpX   = 3 + Math.random() * 4;
+    n.floatAmpY   = 2 + Math.random() * 3;
+    n.baseX = 0; n.baseY = 0; // 基准位置，layout后赋值
+    n.x = 0; n.y = 0;
+  });
+
+  function layout(){
+    W = canvas.offsetWidth;
+    H = canvas.offsetHeight;
+    if(W === 0 || H === 0) return;
+    canvas.width  = W;
+    canvas.height = H;
+    // 按聚类分组分配坐标
+    const groups = [[], [], [], []];
+    NODES.forEach(n => groups[n.cluster].push(n));
+    groups.forEach((g, ci) => {
+      const cp = CLUSTER_POS[ci];
+      const cx = cp.rx * W, cy = cp.ry * H;
+      // 聚类半径：让节点均匀分布，避免重叠
+      const r  = Math.min(W, H) * (ci === 3 ? 0.17 : 0.15);
+      g.forEach((n, j) => {
+        const a = (j / g.length) * Math.PI * 2 - Math.PI / 2;
+        n.baseX = cx + Math.cos(a) * r;
+        n.baseY = cy + Math.sin(a) * r;
+        n.x = n.baseX; n.y = n.baseY;
+      });
+    });
+    initialized = true;
+  }
+
+  // 坐标转换
+  function ts(x, y){ return [x * scale + ox, y * scale + oy]; }
+  function fs(sx, sy){ return [(sx - ox) / scale, (sy - oy) / scale]; }
+
+  // 连线颜色缓存（发光效果用时间驱动）
+  function edgeGlow(t, isHovered){
+    const phase = (t * 0.0012) % 1;
+    const glow  = 0.3 + 0.5 * Math.abs(Math.sin(t * 0.0018));
+    return isHovered
+      ? { stroke: `rgba(0,255,136,${0.55 + glow * 0.3})`, width: 2.2, blur: 8 + glow * 6, shadowColor: '#00ff88' }
+      : { stroke: `rgba(0,200,255,${0.08 + glow * 0.07})`, width: 1,   blur: 0,             shadowColor: '' };
+  }
+
+  // ════════════════════════════════════════════
+  // 特殊节点动画函数
+  // ════════════════════════════════════════════
+
+  // 节点前置背景动画（画在节点主体之前）
+  function drawNodeSpecialBg(ctx, nd, sx, sy, r, t, isH){
+    ctx.save();
+    switch(nd.id){
+
+      case 'pressing': {
+        // 高压迫：向内收缩的压迫脉冲环
+        const rings = 3;
+        for(let i = 0; i < rings; i++){
+          const phase = ((t * 0.0018) + i / rings) % 1;
+          // 从外向内收缩
+          const rr = r * (2.8 - phase * 1.8);
+          const alpha = phase < 0.5 ? phase * 2 * 0.35 : (1 - phase) * 2 * 0.35;
+          ctx.beginPath(); ctx.arc(sx, sy, rr, 0, Math.PI*2);
+          ctx.strokeStyle = `rgba(255,99,132,${alpha})`;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+        break;
+      }
+
+      case 'counter-attack': {
+        // 快速反击：从左到右飞出的速度线尾迹
+        const lines = 4;
+        for(let i = 0; i < lines; i++){
+          const phase = ((t * 0.0022 + i * 0.25) % 1);
+          const len = r * (0.8 + i * 0.3);
+          const yOff = (i - 1.5) * r * 0.35;
+          const x1 = sx - r * 1.8 + phase * r * 3.5;
+          const alpha = Math.sin(phase * Math.PI) * 0.55;
+          ctx.beginPath();
+          ctx.moveTo(x1 - len * 0.6, sy + yOff);
+          ctx.lineTo(x1, sy + yOff);
+          ctx.strokeStyle = `rgba(255,206,86,${alpha})`;
+          ctx.lineWidth = 1.2 - i * 0.15;
+          ctx.stroke();
+        }
+        break;
+      }
+
+      case 'offside-trap': {
+        // 越位陷阱：整体向前推进的虚线防线
+        const linePhase = Math.sin(t * 0.0012) * 0.5 + 0.5; // 0~1 震荡
+        const pushX = sx - r * 0.5 + linePhase * r * 1.0; // 防线左右推进
+        const alpha = 0.5;
+        ctx.beginPath();
+        ctx.setLineDash([4, 4]);
+        ctx.moveTo(pushX, sy - r * 1.8);
+        ctx.lineTo(pushX, sy + r * 1.8);
+        ctx.strokeStyle = `rgba(255,99,132,${alpha})`;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // 三个小点代表后卫
+        for(let i = 0; i < 3; i++){
+          const dy = (i - 1) * r * 1.0;
+          ctx.beginPath(); ctx.arc(pushX, sy + dy, 3, 0, Math.PI*2);
+          ctx.fillStyle = `rgba(255,99,132,0.7)`; ctx.fill();
+        }
+        break;
+      }
+
+      case 'winger': {
+        // 边锋：斜向速度光晕
+        const speed = ((t * 0.002) % 1);
+        for(let i = 0; i < 3; i++){
+          const ph = (speed + i * 0.33) % 1;
+          const x1 = sx - r * 2 + ph * r * 4;
+          const y1 = sy + r * 1.3 - ph * r * 2.6;
+          const alpha = Math.sin(ph * Math.PI) * 0.5;
+          ctx.beginPath();
+          ctx.moveTo(x1 - r*0.4, y1 + r*0.2);
+          ctx.lineTo(x1, y1);
+          ctx.strokeStyle = `rgba(255,120,40,${alpha})`;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+        break;
+      }
+    }
+    ctx.restore();
+  }
+
+  // 节点前景动画（画在节点主体之后、文字之前）
+  function drawNodeSpecialFg(ctx, nd, sx, sy, r, t, isH){
+    ctx.save();
+    switch(nd.id){
+
+      case 'gk': {
+        // 门将：左右扑球弧形手势
+        const angle = Math.sin(t * 0.0014) * 0.9; // -0.9 ~ 0.9 rad
+        ctx.strokeStyle = 'rgba(255,206,86,0.6)';
+        ctx.lineWidth = 2;
+        // 手臂弧线
+        ctx.beginPath();
+        ctx.arc(sx, sy + r * 0.3, r * 1.25,
+          Math.PI + angle - 0.6,
+          Math.PI + angle + 0.6);
+        ctx.stroke();
+        // 手掌小点
+        const hx = sx + Math.cos(Math.PI + angle) * r * 1.25;
+        const hy = sy + r * 0.3 + Math.sin(Math.PI + angle) * r * 1.25;
+        ctx.beginPath(); ctx.arc(hx, hy, 3.5, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(255,206,86,0.8)'; ctx.fill();
+        break;
+      }
+
+      case 'xg': {
+        // xG：右上角显示动态概率值
+        const prob = 0.35 + 0.45 * (0.5 + 0.5 * Math.sin(t * 0.0008));
+        const probStr = prob.toFixed(2);
+        ctx.font = `bold ${Math.max(7, 8*scale)}px monospace`;
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = `rgba(0,255,136,0.85)`;
+        ctx.fillText(probStr, sx + r * 1.0, sy - r * 1.1);
+        // 右上角小圆点脉冲
+        const dot = 0.5 + 0.5 * Math.sin(t * 0.002);
+        ctx.beginPath(); ctx.arc(sx + r * 1.1, sy - r * 1.3, 3 + dot, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(0,255,136,${0.5 + dot*0.4})`; ctx.fill();
+        break;
+      }
+
+      case 'possession': {
+        // 控球率：外圈扇形进度条
+        const pct = 0.52 + 0.18 * (0.5 + 0.5 * Math.sin(t * 0.0007));
+        const startA = -Math.PI / 2;
+        const endA = startA + pct * Math.PI * 2;
+        ctx.beginPath();
+        ctx.arc(sx, sy, r * 1.35, startA, endA);
+        ctx.strokeStyle = 'rgba(0,212,255,0.5)';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+        // 进度数字
+        ctx.font = `bold ${Math.max(6, 7*scale)}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = 'rgba(0,212,255,0.8)';
+        ctx.fillText(Math.round(pct*100)+'%', sx, sy + r * 1.0);
+        break;
+      }
+
+      case 'var': {
+        // VAR：扫描线效果
+        const scanY = sy - r * 1.2 + ((t * 0.0016) % 1) * r * 2.4;
+        ctx.beginPath();
+        ctx.moveTo(sx - r * 1.1, scanY);
+        ctx.lineTo(sx + r * 1.1, scanY);
+        ctx.strokeStyle = 'rgba(0,212,255,0.45)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        // 两侧方形框角
+        const bx = sx - r * 1.1, by = sy - r * 1.1, bw = r * 2.2;
+        const cs = 5;
+        ctx.strokeStyle = 'rgba(0,212,255,0.4)'; ctx.lineWidth = 1.5;
+        [[bx,by],[bx+bw,by],[bx,by+bw],[bx+bw,by+bw]].forEach(([cx,cy]) => {
+          const dx = cx > sx ? -1 : 1, dy = cy > sy ? -1 : 1;
+          ctx.beginPath(); ctx.moveTo(cx+dx*cs,cy); ctx.lineTo(cx,cy); ctx.lineTo(cx,cy+dy*cs); ctx.stroke();
+        });
+        break;
+      }
+
+      case 'offside': {
+        // 越位规则：旗帜飘动
+        const flagWave = Math.sin(t * 0.003);
+        const fx = sx + r * 0.9, fy = sy - r * 0.5;
+        ctx.strokeStyle = 'rgba(255,99,132,0.7)'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(fx, fy + r * 0.9); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(fx, fy);
+        ctx.quadraticCurveTo(fx + r*0.55 + flagWave*4, fy + r*0.2, fx + r*0.1 + flagWave*2, fy + r*0.45);
+        ctx.fillStyle = 'rgba(255,99,132,0.55)'; ctx.fill();
+        break;
+      }
+
+      case 'penalty': {
+        // 点球：向球门飞射的球弧线
+        const shotPhase = ((t * 0.0014) % 1);
+        const bx = sx - r * 0.8 + shotPhase * r * 1.6;
+        const by = sy + r * 0.3 - Math.sin(shotPhase * Math.PI) * r * 0.7;
+        const ballAlpha = Math.sin(shotPhase * Math.PI) * 0.8;
+        ctx.beginPath(); ctx.arc(bx, by, 3, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(255,120,40,${ballAlpha})`; ctx.fill();
+        // 轨迹尾巴
+        const tail = 0.08;
+        if(shotPhase > tail){
+          const bx0 = sx - r * 0.8 + (shotPhase - tail) * r * 1.6;
+          const by0 = sy + r * 0.3 - Math.sin((shotPhase - tail) * Math.PI) * r * 0.7;
+          ctx.beginPath(); ctx.moveTo(bx0, by0); ctx.lineTo(bx, by);
+          ctx.strokeStyle = `rgba(255,120,40,${ballAlpha * 0.4})`;
+          ctx.lineWidth = 1.2; ctx.stroke();
+        }
+        break;
+      }
+
+    }
+    ctx.restore();
+  }
+
+  // Tiki-Taka 节点周围小球传递动画
+  function drawTikiTakaOrbit(ctx, t, scale, ox, oy){
+    const tNode = NODES.find(n => n.id === 'tiki-taka');
+    const amNode = NODES.find(n => n.id === 'am');
+    const cmNode = NODES.find(n => n.id === 'cm');
+    if(!tNode || !amNode || !cmNode) return;
+    const triNodes = [tNode, amNode, cmNode];
+    ctx.save();
+    const numBalls = 3;
+    for(let i = 0; i < numBalls; i++){
+      const phase = ((t * 0.00055 + i / numBalls) % 1);
+      // 在三角形三条边上传递
+      const edge = Math.floor(phase * 3);
+      const p = (phase * 3) % 1;
+      const n1 = triNodes[edge], n2 = triNodes[(edge+1)%3];
+      const [x1,y1] = [n1.x * scale + ox, n1.y * scale + oy];
+      const [x2,y2] = [n2.x * scale + ox, n2.y * scale + oy];
+      // 贝塞尔弧线中点
+      const mx = (x1+x2)/2 - (y2-y1)*0.25;
+      const my = (y1+y2)/2 + (x2-x1)*0.25;
+      const bx = (1-p)*(1-p)*x1 + 2*(1-p)*p*mx + p*p*x2;
+      const by = (1-p)*(1-p)*y1 + 2*(1-p)*p*my + p*p*y2;
+      const alpha = 0.55 + 0.3 * Math.sin(phase * Math.PI * 6);
+      ctx.beginPath(); ctx.arc(bx, by, 3.5, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(0,212,255,${alpha})`;
+      ctx.shadowBlur = 8; ctx.shadowColor = '#00d4ff';
+      ctx.fill();
+      // 尾巴
+      const pp = Math.max(0, p - 0.07);
+      const bx0 = (1-pp)*(1-pp)*x1 + 2*(1-pp)*pp*mx + pp*pp*x2;
+      const by0 = (1-pp)*(1-pp)*y1 + 2*(1-pp)*pp*my + pp*pp*y2;
+      ctx.beginPath(); ctx.moveTo(bx0, by0); ctx.lineTo(bx, by);
+      ctx.strokeStyle = `rgba(0,212,255,${alpha*0.35})`; ctx.lineWidth = 1.5;
+      ctx.shadowBlur = 0;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function draw(t){
+    if(!initialized){ requestAnimationFrame(draw); return; }
+    tick = t;
+    ctx.clearRect(0,0,W,H);
+
+    // ── 画连线 ──
+    EDGES.forEach(([a, b]) => {
+      const na = NODES.find(n => n.id === a), nb = NODES.find(n => n.id === b);
+      if(!na || !nb) return;
+      const isH = hovered && (hovered.id === a || hovered.id === b);
+      const eg   = edgeGlow(t, isH);
+      const [x1,y1] = ts(na.x, na.y), [x2,y2] = ts(nb.x, nb.y);
+
+      if(eg.blur > 0){
+        ctx.save();
+        ctx.shadowBlur   = eg.blur;
+        ctx.shadowColor  = eg.shadowColor;
+      }
+      // 发光底层（叠加两次使辉光更亮）
+      if(isH){
+        ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
+        ctx.strokeStyle = 'rgba(0,255,136,0.15)'; ctx.lineWidth = 6; ctx.stroke();
+      }
+      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
+      ctx.strokeStyle = eg.stroke; ctx.lineWidth = eg.width; ctx.stroke();
+      if(eg.blur > 0) ctx.restore();
+
+      // 流动光点（高亮连线时）
+      if(isH){
+        const prog = ((t * 0.0008) % 1);
+        const px = x1 + (x2-x1)*prog, py = y1 + (y2-y1)*prog;
+        ctx.beginPath(); ctx.arc(px, py, 2.5, 0, Math.PI*2);
+        ctx.fillStyle = '#00ff88'; ctx.shadowBlur=10; ctx.shadowColor='#00ff88'; ctx.fill();
+        ctx.shadowBlur=0;
+      }
+    });
+
+    // ── 画节点 ──
+    NODES.forEach(nd => {
+      // 飘动：仅非拖拽状态
+      if(dragging !== nd){
+        const now = t * nd.floatSpeed + nd.floatPhase;
+        nd.x = nd.baseX + Math.sin(now)       * nd.floatAmpX;
+        nd.y = nd.baseY + Math.cos(now * 1.3)  * nd.floatAmpY;
+      }
+      const [sx, sy] = ts(nd.x, nd.y);
+      const r   = 22 * scale;
+      const isH = hovered && hovered.id === nd.id;
+      const glowPulse = 0.6 + 0.4 * Math.abs(Math.sin(t * 0.0015 + nd.floatPhase));
+
+      // ── 特殊节点专属前置动画 ──
+      drawNodeSpecialBg(ctx, nd, sx, sy, r, t, isH);
+
+      // 外圈发光晕
+      if(isH){
+        const grad = ctx.createRadialGradient(sx,sy, r*0.5, sx,sy, r*2.2);
+        grad.addColorStop(0, nd.color + '44');
+        grad.addColorStop(1, 'transparent');
+        ctx.beginPath(); ctx.arc(sx,sy, r*2.2, 0, Math.PI*2);
+        ctx.fillStyle = grad; ctx.fill();
+      }
+
+      // 节点主体
+      ctx.save();
+      ctx.shadowBlur   = isH ? 24 * glowPulse : 8 * glowPulse;
+      ctx.shadowColor  = nd.color;
+      ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI*2);
+      // 渐变填充
+      const g2 = ctx.createRadialGradient(sx-r*.3, sy-r*.3, 0, sx, sy, r);
+      g2.addColorStop(0, isH ? nd.color + 'cc' : 'rgba(18,36,72,0.95)');
+      g2.addColorStop(1, isH ? nd.color + '55' : 'rgba(8,18,40,0.95)');
+      ctx.fillStyle = g2; ctx.fill();
+      ctx.strokeStyle = nd.color + (isH ? 'ff' : '99');
+      ctx.lineWidth = isH ? 2.5 : 1.5; ctx.stroke();
+      ctx.restore();
+
+      // ── 特殊节点专属前景动画叠加 ──
+      drawNodeSpecialFg(ctx, nd, sx, sy, r, t, isH);
+
+      // 节点文字
+      ctx.fillStyle  = isH ? '#fff' : 'rgba(255,255,255,0.85)';
+      ctx.font       = `${isH ? 700 : 500} ${Math.max(9, 10*scale)}px 'Segoe UI','PingFang SC',sans-serif`;
+      ctx.textAlign  = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(nd.label, sx, sy);
+    });
+
+    // ── Tiki-Taka 全局传球小球动画（覆盖在所有节点上层）──
+    drawTikiTakaOrbit(ctx, t, scale, ox, oy);
+
+    requestAnimationFrame(draw);
+  }
+
+  function nodeAt(sx, sy){
+    const [wx, wy] = fs(sx, sy);
+    return NODES.find(nd => {
+      const dx = nd.x - wx, dy = nd.y - wy;
+      return Math.sqrt(dx*dx + dy*dy) < 26;
+    }) || null;
+  }
+  function getRect(){ return canvas.getBoundingClientRect(); }
+
+  canvas.addEventListener('mousedown', e => {
+    const r = getRect(), sx = e.clientX-r.left, sy = e.clientY-r.top;
+    const nd = nodeAt(sx, sy);
+    if(nd){ dragging = nd; dragMoved = false; }
+    else{ panning = true; lmx = sx; lmy = sy; panMoved = false; }
+  });
+
+  canvas.addEventListener('mousemove', e => {
+    const r = getRect(), sx = e.clientX-r.left, sy = e.clientY-r.top;
+    hovered = nodeAt(sx, sy);
+    canvas.style.cursor = hovered ? 'pointer' : (panning ? 'grabbing' : 'grab');
+    if(dragging){
+      const [wx,wy] = fs(sx, sy);
+      if(Math.abs(wx-dragging.baseX)+Math.abs(wy-dragging.baseY) > 3) dragMoved = true;
+      dragging.baseX = dragging.x = wx;
+      dragging.baseY = dragging.y = wy;
+    } else if(panning){
+      ox += sx-lmx; oy += sy-lmy;
+      if(Math.abs(sx-lmx)+Math.abs(sy-lmy) > 3) panMoved = true;
+      lmx = sx; lmy = sy;
+    }
+  });
+
+  canvas.addEventListener('mouseup', e => {
+    if(dragging){
+      // 未移动则视为点击节点
+      if(!dragMoved) openModal(dragging.id);
+      dragging = null; dragMoved = false;
+      return;
+    }
+    if(panning && !panMoved){
+      const r = getRect(), nd = nodeAt(e.clientX-r.left, e.clientY-r.top);
+      if(nd) openModal(nd.id);
+    }
+    panning = false; panMoved = false;
+  });
+
+  canvas.addEventListener('wheel', e => {
+    // 仅当鼠标悬停在节点上，或按住 Ctrl/Meta 时才缩放图谱（避免阻止页面正常滚动）
+    if(hovered || e.ctrlKey || e.metaKey){
+      e.preventDefault();
+      scale = Math.max(.3, Math.min(3, scale * (e.deltaY > 0 ? 0.9 : 1.1)));
+    }
+  }, {passive: false});
+
+  // 触摸支持
+  let lastTouch = null;
+  canvas.addEventListener('touchstart', e => {
+    if(e.touches.length === 1){
+      const r = getRect(), t0 = e.touches[0];
+      const sx = t0.clientX-r.left, sy = t0.clientY-r.top;
+      const nd = nodeAt(sx, sy);
+      if(nd){ dragging = nd; dragMoved = false; lastTouch = {sx, sy}; }
+      else{ panning = true; lmx = sx; lmy = sy; panMoved = false; lastTouch = {sx,sy}; }
+    }
+    e.preventDefault();
+  }, {passive:false});
+
+  canvas.addEventListener('touchmove', e => {
+    if(e.touches.length === 1){
+      const r = getRect(), t0 = e.touches[0];
+      const sx = t0.clientX-r.left, sy = t0.clientY-r.top;
+      if(dragging){
+        const [wx,wy] = fs(sx,sy);
+        if(Math.abs(wx-dragging.baseX)+Math.abs(wy-dragging.baseY) > 3) dragMoved = true;
+        dragging.baseX = dragging.x = wx; dragging.baseY = dragging.y = wy;
+      } else if(panning){
+        ox += sx-lmx; oy += sy-lmy; lmx=sx; lmy=sy; panMoved=true;
+      }
+    }
+    e.preventDefault();
+  }, {passive:false});
+
+  canvas.addEventListener('touchend', e => {
+    if(dragging){
+      if(!dragMoved) openModal(dragging.id);
+      dragging=null; dragMoved=false; lastTouch=null; return;
+    }
+    if(!panMoved){
+      const r = getRect(), t0 = e.changedTouches[0];
+      const nd = nodeAt(t0.clientX-r.left, t0.clientY-r.top);
+      if(nd) openModal(nd.id);
+    }
+    panning=false; panMoved=false; lastTouch=null;
+  });
+
+  // ResizeObserver 确保 iframe 可见后正确初始化
+  function tryInit(){
+    const ow = canvas.offsetWidth, oh = canvas.offsetHeight;
+    if(ow > 0 && oh > 0){ layout(); }
+  }
+  // 延迟一帧，等 resizeGraphWrap 设置的 style.height 生效后再读 offsetHeight
+  requestAnimationFrame(tryInit);
+
+  if(window.ResizeObserver){
+    new ResizeObserver(() => { if(!initialized) tryInit(); else layout(); })
+      .observe(canvas);
+  }
+  // 定期重试（针对 iframe 初始隐藏问题）
+  let retryCount = 0;
+  const retryTimer = setInterval(() => {
+    if(initialized || retryCount++ > 30){ clearInterval(retryTimer); return; }
+    tryInit();
+  }, 100);
+
+  requestAnimationFrame(draw);
+})();
+
+// ════════════════════════════════════════════
+// 卡片渲染
+// ════════════════════════════════════════════
+let curCat = 'all', curQ = '';
+// 声明在 renderCards() 调用之前，避免 let 暂时性死区（TDZ）
+let _sectionObserver = null;
+let _observerLocked = false;
+function renderCards(){
+  const con = document.getElementById('cards-container');
+  let items = KB.filter(k => {
+    const catOk = curCat === 'all' || k.cat === curCat;
+    const q = curQ.trim().toLowerCase();
+    const qOk = !q || k.name.includes(q) || k.en.toLowerCase().includes(q)
+              || (k.short&&k.short.includes(q)) || (k.detail&&k.detail.includes(q));
+    return catOk && qOk;
+  });
+  if(!items.length){
+    con.innerHTML='<div class="empty-tip"><i class="fas fa-search-minus"></i>未找到匹配术语，请尝试其他关键词</div>';
+    return;
+  }
+  const cats = curCat === 'all' ? ['position','tactics','skill','rule','stats','event'] : [curCat];
+  let html = '';
+  cats.forEach(cat => {
+    const group = items.filter(k => k.cat === cat);
+    if(!group.length) return;
+    const catIcon = {position:'fas fa-running',tactics:'fas fa-chess',skill:'fas fa-futbol',
+                     rule:'fas fa-flag',stats:'fas fa-chart-bar',event:'fas fa-trophy'}[cat] || 'fas fa-circle';
+    // 为每个分类区块添加 id，供导航跳转和 IntersectionObserver 使用
+    html += `<div class="section-hd" id="section-${cat}" data-cat="${cat}"><i class="${catIcon}" style="color:var(--primary);font-size:.85rem"></i>${CAT_NAMES[cat]||cat}<span class="badge">${group.length}</span></div>`;
+    html += '<div class="cards-grid">';
+    group.forEach(k => {
+      const tags = k.tags.map(t =>
+        `<span class="tag" style="color:${t.c};border-color:${t.c};background:${t.b}">${t.t}</span>`
+      ).join('');
+      html += `<div class="kcard" style="--kc:${k.color};--kc-glow:${k.bg}" onclick="openModal('${k.id}')">
+        <div class="kcard-head">
+          <div class="kcard-ico" style="background:${k.bg};color:${k.color}"><i class="${k.icon}"></i></div>
+          <div><div class="kcard-name">${k.name}</div><div class="kcard-en">${k.en}</div></div>
+        </div>
+        <div class="kcard-desc">${k.short}</div>
+        <div class="kcard-tags">${tags}</div>
+      </div>`;
+    });
+    html += '</div>';
+  });
+  con.innerHTML = html;
+  // 重新绑定 IntersectionObserver（内容刷新后需重建）
+  _bindSectionObserver();
+}
+renderCards();
+
+// ════════════════════════════════════════════
+// 分类切换 & 搜索
+// ════════════════════════════════════════════
+
+// 必须在 renderCards()/switchCat 调用之前声明，避免 let 暂时性死区（TDZ）报错
+// graph-wrap 显隐控制：点击具体分类时隐藏图谱，"全部"时恢复
+function _setGraphVisible(visible){
+  const gw = document.getElementById('graph-wrap');
+  if(!gw) return;
+  if(visible){
+    gw.classList.remove('graph-hidden');
+  } else {
+    gw.classList.add('graph-hidden');
+  }
+}
+
+// 更新导航高亮
+function _highlightCatBtn(cat){
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.querySelector(`.cat-btn[data-cat="${cat}"]`)
+           || document.querySelector('.cat-btn[data-cat="all"]');
+  if(btn) btn.classList.add('active');
+}
+
+// 滚动高亮：用 IntersectionObserver 监听 section-hd，滚动到哪个模块就高亮哪个按钮
+function _bindSectionObserver(){
+  if(_sectionObserver){ _sectionObserver.disconnect(); }
+  const mainEl = document.querySelector('.main');
+  _sectionObserver = new IntersectionObserver(function(entries){
+    if(_observerLocked) return;
+    // 找所有可见 section 中 top 最小的（最靠近顶部）
+    const visible = entries.filter(function(e){ return e.isIntersecting; });
+    if(!visible.length) return;
+    visible.sort(function(a,b){ return a.boundingClientRect.top - b.boundingClientRect.top; });
+    _highlightCatBtn(visible[0].target.dataset.cat);
+  }, {
+    root: mainEl || null,
+    rootMargin: '-5% 0px -55% 0px',
+    threshold: 0
+  });
+  document.querySelectorAll('.section-hd[data-cat]').forEach(function(el){
+    _sectionObserver.observe(el);
+  });
+}
+
+// 全局分类切换函数
+function switchCat(cat){
+  if(cat === 'all'){
+    // 点击"全部"：确保全部模式，图谱显示，滚回顶部
+    curCat = 'all';
+    _highlightCatBtn('all');
+    _setGraphVisible(true);
+    renderCards();
+    var mainEl = document.querySelector('.main');
+    if(mainEl) mainEl.scrollTo({top: 0, behavior: 'smooth'});
+    return;
+  }
+
+  // 点击具体分类：保持"全部"模式显示所有卡片，滚动跳转到对应 section
+  // 若当前不是 all 模式，先切回 all 并重新渲染
+  if(curCat !== 'all'){
+    curCat = 'all';
+    _setGraphVisible(false);
+    renderCards();
+  }
+
+  // 高亮导航按钮
+  _highlightCatBtn(cat);
+
+  // 临时锁住 IntersectionObserver，防止滚动过程中高亮被覆盖
+  _observerLocked = true;
+  clearTimeout(window._obsLockTimer);
+  window._obsLockTimer = setTimeout(function(){ _observerLocked = false; }, 800);
+
+  // 跳转到对应 section（等 renderCards 完成 DOM 更新后执行）
+  requestAnimationFrame(function(){
+    var sec = document.getElementById('section-' + cat);
+    var mainEl = document.querySelector('.main');
+    if(sec && mainEl){
+      // 计算 section 相对于 .main 滚动容器的偏移，减去 cat-bar 高度（约 44px）留出间距
+      var secTop = sec.getBoundingClientRect().top;
+      var mainTop = mainEl.getBoundingClientRect().top;
+      var offset = mainEl.scrollTop + (secTop - mainTop) - 8;
+      mainEl.scrollTo({top: offset, behavior: 'smooth'});
+    }
+  });
+}
+
+document.getElementById('search-input').addEventListener('input', e => {
+  curQ = e.target.value;
+  if(curQ){
+    curCat = 'all';
+    _highlightCatBtn('all');
+    _setGraphVisible(true);
+  }
+  renderCards();
+});
+
+// ════════════════════════════════════════════
+// 弹窗
+// ════════════════════════════════════════════
+function openModal(id){
+  const k = ID_MAP[id]; if(!k) return;
+  const pts = k.points.map(p => `<li>${p}</li>`).join('');
+  const rel = k.related
+    .map(rid => { const r = ID_MAP[rid]; return r ? `<span class="rchip" onclick="openModal('${rid}')">${r.name}</span>` : ''; })
+    .filter(Boolean).join('');
+  // 3D动画支持的术语
+  const anim3dIds = ['pressing','tiki-taka','counter-attack','offside-trap','cross',
+                     'through-ball','dribble','penalty','offside','formation-433','formation-442',
+                     'gk','cb','winger','cf','false9','tackle','header',
+                     'corner','handball','formation-352'];
+  const has3d = anim3dIds.includes(id);
+  const animHtml = has3d
+    ? `<div class="anim3d-wrap" id="anim3d-wrap">
+        <div class="anim3d-loading" id="anim3d-loading"><i class="fas fa-spinner fa-spin"></i> 3D 加载中…</div>
+        <div class="anim3d-badge">3D · 互动</div>
+        <div class="anim3d-label" id="anim3d-label"></div>
+       </div>`
+    : '';
+  document.getElementById('modal-content').innerHTML = `
+    <div class="modal-ico" style="background:${k.bg};color:${k.color}"><i class="${k.icon}"></i></div>
+    <div class="modal-title">${k.name}</div>
+    <div class="modal-en">${k.en}</div>
+    ${animHtml}
+    <div class="msec"><div class="msec-title"><i class="fas fa-info-circle"></i> 概述</div><div class="msec-text">${k.detail}</div></div>
+    <div class="msec"><div class="msec-title"><i class="fas fa-list-ul"></i> 要点</div><ul class="mlist">${pts}</ul></div>
+    ${rel ? `<div class="msec"><div class="msec-title"><i class="fas fa-link"></i> 相关术语</div><div class="related-chips">${rel}</div></div>` : ''}
+  `;
+  document.getElementById('modal').classList.add('open');
+  document.getElementById('modal-box').scrollTop = 0;
+  if(has3d){ setTimeout(() => start3DScene(id), 60); }
+}
+function closeModal(){
+  document.getElementById('modal').classList.remove('open');
+  stop3DScene();
+}
+
+
+// ════════════════════════════════════════════
+// 3D 战术演示引擎（Three.js）
+// ════════════════════════════════════════════
+let _3d = null; // { renderer, scene, camera, raf, dispose }
+
+function stop3DScene(){
+  if(!_3d) return;
+  cancelAnimationFrame(_3d.raf);
+  _3d.dispose();
+  _3d = null;
+}
+
+function start3DScene(id){
+  stop3DScene();
+
+  // Three.js 尚未加载：等待最多 5 秒后重试，若仍失败则显示提示
+  if(typeof THREE === 'undefined'){
+    const wrap = document.getElementById('anim3d-wrap'); 
+    const loading = document.getElementById('anim3d-loading');
+    if(loading) loading.textContent = '3D 引擎加载中…';
+    let waited = 0;
+    const timer = setInterval(function(){
+      waited += 200;
+      if(typeof THREE !== 'undefined'){
+        clearInterval(timer);
+        start3DScene(id);  // THREE 已就绪，重新启动
+      } else if(waited >= 5000){
+        clearInterval(timer);
+        if(loading){
+          loading.style.display = 'flex';
+          loading.innerHTML = '<i class="fas fa-exclamation-circle" style="color:#ff6384;margin-right:6px"></i>3D 动画加载失败（网络异常），请刷新页面重试';
+        }
+      }
+    }, 200);
+    return;
+  }
+  const wrap = document.getElementById('anim3d-wrap'); if(!wrap) return;
+  const loading = document.getElementById('anim3d-loading');
+  const labelEl = document.getElementById('anim3d-label');
+
+  // ── 渲染器 ──
+  const W = wrap.clientWidth || 480, H = wrap.clientHeight || 220;
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(W, H);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.setClearColor(0x000000, 0);
+  wrap.appendChild(renderer.domElement);
+  if(loading) loading.style.display = 'none';
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x071428, 28, 55);
+
+  // ── 相机 ──
+  const camera = new THREE.PerspectiveCamera(52, W / H, 0.1, 100);
+  camera.position.set(0, 9, 14);
+  camera.lookAt(0, 0, 0);
+
+  // ── 灯光 ──
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.0);
+  sun.position.set(8, 16, 8);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(512, 512);
+  sun.shadow.camera.near = 0.5;
+  sun.shadow.camera.far = 60;
+  sun.shadow.camera.left = -16; sun.shadow.camera.right = 16;
+  sun.shadow.camera.top  = 12;  sun.shadow.camera.bottom = -12;
+  scene.add(sun);
+  const fill = new THREE.DirectionalLight(0x88ccff, 0.3);
+  fill.position.set(-8, 5, -5);
+  scene.add(fill);
+
+  // ── 工具函数 ──
+  // 创建"小人"：高挑胶囊身体 + 球形头 + 手臂 + 腿
+  function makePlayer(bodyColor, headColor){
+    const g = new THREE.Group();
+    // ── 几何体全部以"脚底 = y=0"为基准向上排列 ──
+    // 脚 (底部 y=0, 高0.09) → center y=0.045 → 0~0.09
+    const footGeo = new THREE.BoxGeometry(0.14, 0.09, 0.28);
+    const footMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+    [-0.13, 0.13].forEach((dx, i) => {
+      const foot = new THREE.Mesh(footGeo, footMat);
+      foot.position.set(dx, 0.045, 0.07);
+      g.add(foot);
+      g.userData['foot'+i] = foot;
+    });
+    // 腿 (高0.65) → 底部=0.09, center=0.09+0.325=0.415 → top=0.74
+    const legGeo = new THREE.CylinderGeometry(0.09, 0.08, 0.65, 7);
+    const legMat = new THREE.MeshLambertMaterial({ color: 0x222244 });
+    [-0.13, 0.13].forEach((dx, i) => {
+      const leg = new THREE.Mesh(legGeo, legMat);
+      leg.position.set(dx, 0.415, 0);
+      leg.castShadow = true;
+      g.add(leg);
+      g.userData['leg'+i] = leg;
+    });
+    // 躯干 (高1.1) → 底部=0.74, center=0.74+0.55=1.29 → top=1.84
+    const bodyGeo = new THREE.CylinderGeometry(0.16, 0.18, 1.1, 8);
+    const bodyMat = new THREE.MeshLambertMaterial({ color: bodyColor });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.y = 1.29;
+    body.castShadow = true;
+    g.add(body);
+    // 手臂 → center 与躯干上半部对齐 y=1.49
+    const armGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.65, 6);
+    const armMat = new THREE.MeshLambertMaterial({ color: bodyColor });
+    [-1, 1].forEach((side, i) => {
+      const arm = new THREE.Mesh(armGeo, armMat);
+      arm.position.set(side * 0.34, 1.49, 0);
+      arm.rotation.z = side * 0.45;
+      arm.castShadow = true;
+      g.add(arm);
+      g.userData['arm'+i] = arm;
+    });
+    // 头 → 躯干顶部 y=1.84, 头球半径0.26 → center y=1.84+0.26=2.10
+    const headGeo = new THREE.SphereGeometry(0.26, 12, 10);
+    const headMat = new THREE.MeshLambertMaterial({ color: 0xf5c87a });
+    const head = new THREE.Mesh(headGeo, headMat);
+    head.position.y = 2.10;
+    head.castShadow = true;
+    g.add(head);
+    // 发帽
+    const capGeo = new THREE.SphereGeometry(0.20, 10, 6, 0, Math.PI*2, 0, Math.PI*0.55);
+    const capMat = new THREE.MeshLambertMaterial({ color: headColor });
+    const cap = new THREE.Mesh(capGeo, capMat);
+    cap.position.y = 2.10;
+    g.add(cap);
+    // group 的 y = 0 时脚底恰好在世界 y=0（站在地面上）
+    // 动画中若需上跳，直接 player.position.y = jumpOffset（正值=升空）
+    return g;
+  }
+
+  // 足球（亮橙黄色，更大，黑色花纹明显）
+  function makeBall(){
+    const geo = new THREE.SphereGeometry(0.26, 16, 12);
+    const mat = new THREE.MeshLambertMaterial({ color: 0xf5a623 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.castShadow = true;
+    // 黑色花纹（线框叠加）
+    const wf = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(0.27, 1)),
+      new THREE.LineBasicMaterial({ color: 0x111111, transparent: true, opacity: 0.75 })
+    );
+    mesh.add(wf);
+    mesh.position.y = 0.26;
+    return mesh;
+  }
+
+  // 球场地面（绿色条纹）
+  function makeField(fw, fd){
+    const group = new THREE.Group();
+    // 主草地
+    const geo = new THREE.PlaneGeometry(fw, fd);
+    const mat = new THREE.MeshLambertMaterial({ color: 0x2d7a3a });
+    const plane = new THREE.Mesh(geo, mat);
+    plane.rotation.x = -Math.PI/2;
+    plane.receiveShadow = true;
+    group.add(plane);
+
+    // 条纹（交替深浅）
+    const stripeW = fw / 8;
+    for(let i = 0; i < 8; i++){
+      if(i % 2 === 0) continue;
+      const sg = new THREE.PlaneGeometry(stripeW, fd);
+      const sm = new THREE.MeshLambertMaterial({ color: 0x28703510, transparent: true, opacity: 0.18 });
+      const s = new THREE.Mesh(sg, sm);
+      s.rotation.x = -Math.PI/2;
+      s.position.set(-fw/2 + stripeW*(i+0.5), 0.001, 0);
+      group.add(s);
+    }
+
+    // 白线（边框 + 中线 + 中圈 + 禁区）
+    const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.65 });
+    function addRect(x,z,w,d){
+      const pts = [
+        new THREE.Vector3(x-w/2,0.01,z-d/2), new THREE.Vector3(x+w/2,0.01,z-d/2),
+        new THREE.Vector3(x+w/2,0.01,z+d/2), new THREE.Vector3(x-w/2,0.01,z+d/2),
+        new THREE.Vector3(x-w/2,0.01,z-d/2)
+      ];
+      const g = new THREE.BufferGeometry().setFromPoints(pts);
+      group.add(new THREE.Line(g, lineMat));
+    }
+    addRect(0, 0, fw, fd); // 边框
+    // 中线
+    const midPts = [new THREE.Vector3(0,0.01,-fd/2),new THREE.Vector3(0,0.01,fd/2)];
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(midPts), lineMat));
+    // 中圈
+    const circPts = [];
+    for(let i=0;i<=48;i++) circPts.push(new THREE.Vector3(Math.cos(i/48*Math.PI*2)*2,0.01,Math.sin(i/48*Math.PI*2)*2));
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(circPts), lineMat));
+    // 左禁区
+    addRect(-fw/2+3, 0, 6, fd*0.45);
+    // 右禁区
+    addRect(fw/2-3, 0, 6, fd*0.45);
+    // 球门构建函数（x方向面向场内，sign=+1右门/-1左门）
+    function buildGoal(cx, sign){
+      const postGeo = new THREE.CylinderGeometry(0.055, 0.055, 2.2, 8);
+      const postMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+      // 左右立柱
+      [-1.1, 1.1].forEach(zz => {
+        const p = new THREE.Mesh(postGeo, postMat);
+        p.position.set(cx, 1.1, zz);
+        p.castShadow = true;
+        group.add(p);
+      });
+      // 横梁（沿Z轴方向连接两立柱顶部）
+      const barGeo = new THREE.CylinderGeometry(0.055, 0.055, 2.2, 8);
+      const bar = new THREE.Mesh(barGeo, postMat);
+      bar.position.set(cx, 2.2, 0);
+      bar.rotation.x = Math.PI / 2; // 沿Z轴方向铺开
+      bar.castShadow = true;
+      group.add(bar);
+      // 背网（半透明）
+      const netGeo = new THREE.PlaneGeometry(0.9, 2.2);
+      const netMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff, transparent: true, opacity: 0.12, side: THREE.DoubleSide
+      });
+      // 顶网（水平）
+      const topNet = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 2.2), netMat);
+      topNet.rotation.x = Math.PI / 2;
+      topNet.position.set(cx + sign * 0.45, 2.2, 0);
+      group.add(topNet);
+      // 背网（垂直）
+      const backNet = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 2.2), netMat);
+      backNet.rotation.y = Math.PI / 2;
+      backNet.position.set(cx + sign * 0.9, 1.1, 0);
+      group.add(backNet);
+      // 球门线白线标记
+      const lineMat2 = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 });
+      const glPts = [
+        new THREE.Vector3(cx, 0.01, -1.1), new THREE.Vector3(cx, 0.01, 1.1)
+      ];
+      group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(glPts), lineMat2));
+    }
+    buildGoal(fw / 2, +1);  // 右球门（背网向右）
+    buildGoal(-fw / 2, -1); // 左球门（背网向左）
+    return group;
+  }
+
+  // lerp 工具
+  const lerp = (a,b,t) => a+(b-a)*t;
+
+  // ── 各术语3D场景 ──
+  const FW = 18, FD = 11; // 场地宽深
+  scene.add(makeField(FW, FD));
+
+  const scenes3d = {
+
+    // ── 高压迫 ──
+    pressing: () => {
+      const label = '高压迫 · Gegenpressing — 失球后5秒内围抢';
+      const defenders = [], pressers = [];
+      const defPositions  = [[-5,0,-3],[-5,0,0],[-5,0,3]];
+      const presPositions = [[-2,0,-3],[-2,0,0],[-2,0,3]];
+      defPositions.forEach(p=>{ const pl=makePlayer(0xff4466,0xffaaaa); pl.position.set(...p); scene.add(pl); defenders.push(pl); });
+      presPositions.forEach(p=>{ const pl=makePlayer(0x00cc66,0x88ffbb); pl.position.set(...p); scene.add(pl); pressers.push(pl); });
+      const ball = makeBall(); ball.position.set(-5,0.26,0); scene.add(ball);
+      // 箭头（用Line模拟）
+      const arrows = pressers.map((pr,i)=>{
+        const pts=[pr.position.clone(),defenders[i].position.clone()];
+        const g=new THREE.BufferGeometry().setFromPoints(pts);
+        const line=new THREE.Line(g,new THREE.LineBasicMaterial({color:0x00ff88,transparent:true,opacity:0.6}));
+        scene.add(line); return {line,pr,def:defenders[i]};
+      });
+      camera.position.set(0,11,10); camera.lookAt(-3,0,0);
+      let t=0;
+      return { label, update(dt){ t+=dt;
+        const adv = 0.5+0.5*Math.sin(t*0.9);
+        pressers.forEach((pr,i)=>{
+          pr.position.x = lerp(-2,-4.2,adv);
+          // 腿部摆动
+          const leg = 0.3*Math.sin(t*3+i);
+          if(pr.userData.leg0) pr.userData.leg0.rotation.x = leg;
+          if(pr.userData.leg1) pr.userData.leg1.rotation.x = -leg;
+          // 更新箭头
+          const a=arrows[i];
+          const pts=[a.pr.position.clone(),a.def.position.clone()];
+          a.line.geometry.setFromPoints(pts); a.line.geometry.computeBoundingSphere();
+        });
+        // 相机轻微晃动
+        camera.position.x = -3 + Math.sin(t*0.3)*0.5;
+      }};
+    },
+
+    // ── Tiki-Taka ──
+    'tiki-taka': () => {
+      const label = 'Tiki-Taka · 菱形快速短传';
+      const positions = [[-4,0,-3],[-4,0,3],[-1,0,-2],[-1,0,2],[1,0,0]];
+      const colors = [0x00aaff,0x00aaff,0x00aaff,0x00aaff,0x00aaff];
+      const players = positions.map((p,i)=>{
+        const pl=makePlayer(colors[i],0xaaddff); pl.position.set(...p); scene.add(pl); return pl;
+      });
+      const ball=makeBall(); scene.add(ball);
+      camera.position.set(0,9,12); camera.lookAt(-1,0,0);
+      const passes=[[0,2],[2,4],[4,3],[3,1],[1,0],[0,4],[4,2]];
+      let passIdx=0,passT=0,PASS_DUR=1.2;
+      let t=0;
+      return { label, update(dt){ t+=dt; passT+=dt;
+        if(passT>=PASS_DUR){ passT=0; passIdx=(passIdx+1)%passes.length; }
+        const [ai,bi]=passes[passIdx], p=passT/PASS_DUR;
+        const pa=players[ai].position, pb=players[bi].position;
+        ball.position.x=lerp(pa.x,pb.x,p);
+        ball.position.z=lerp(pa.z,pb.z,p);
+        ball.position.y=0.26+0.5*Math.sin(p*Math.PI);
+        ball.rotation.z+=dt*6;
+        // 持球者朝接球者方向看
+        players[ai].rotation.y=Math.atan2(pb.x-pa.x,pb.z-pa.z);
+        // 相机慢转
+        camera.position.x=Math.sin(t*0.15)*5;
+        camera.position.z=12+Math.cos(t*0.15)*2;
+        camera.lookAt(-1,0,0);
+      }};
+    },
+
+    // ── 快速反击 ──
+    'counter-attack': () => {
+      const label = '快速反击 · Counter Attack — 低位防守→闪电冲刺';
+      const defTeam=[], runners=[];
+      [[-7,0,-3],[-7,0,0],[-7,0,3],[-6,0,0]].forEach(p=>{
+        const pl=makePlayer(0x00cc66,0x88ffbb); pl.position.set(...p); scene.add(pl); defTeam.push(pl);
+      });
+      [[2,0,-2],[2,0,2]].forEach(p=>{
+        const pl=makePlayer(0xff4466,0xffaaaa); pl.position.set(...p); scene.add(pl);
+      });
+      // 反击跑者
+      const runner=makePlayer(0xffcc00,0xffee88); runner.position.set(-5,0,0); scene.add(runner); runners.push(runner);
+      const ball=makeBall(); ball.position.set(-5,0.26,0); scene.add(ball);
+      camera.position.set(0,10,13); camera.lookAt(2,0,0);
+      let t=0,phase=0;
+      return { label, update(dt){ t+=dt; phase+=dt*0.4;
+        const p=(Math.sin(phase)+1)/2; // 0~1 往复
+        runner.position.x=lerp(-5,6,p);
+        runner.position.z=lerp(0,-2,Math.sin(phase*0.7)*0.5+0.5);
+        // 腿部跑动
+        const leg=0.4*Math.sin(t*5);
+        runner.userData.leg0.rotation.x=leg; runner.userData.leg1.rotation.x=-leg;
+        // 球跟随
+        const bDelay=Math.max(0,p-0.1);
+        ball.position.x=lerp(-5,6,bDelay);
+        ball.position.y=0.26+0.3*Math.abs(Math.sin(bDelay*Math.PI*4));
+        ball.rotation.z+=dt*5;
+        // 朝前看
+        runner.rotation.y=-Math.PI/2;
+        camera.position.x=runner.position.x*0.3;
+        camera.lookAt(runner.position.x+3,0,0);
+      }};
+    },
+
+    // ── 越位陷阱 ──
+    'offside-trap': () => {
+      const label = '越位陷阱 · Offside Trap — 防线整体前推';
+      const defs=[];
+      [-4,0,4].forEach(z=>{
+        const pl=makePlayer(0xff4466,0xffaaaa); pl.position.set(0,0,z); scene.add(pl); defs.push(pl);
+      });
+      // 对方前锋（已越位）
+      const fwd=makePlayer(0xffcc00,0xffee88); fwd.position.set(3,0,-1); scene.add(fwd);
+      const ball=makeBall(); ball.position.set(-3,0.26,0); scene.add(ball);
+      // 越位线（橙色线）
+      const linePts=[new THREE.Vector3(0,0.05,-5.5),new THREE.Vector3(0,0.05,5.5)];
+      const lineMat=new THREE.LineBasicMaterial({color:0xff4466,transparent:true,opacity:0.8});
+      const offsideLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints(linePts),lineMat);
+      scene.add(offsideLine);
+      camera.position.set(-4,9,11); camera.lookAt(0,0,0);
+      let t=0;
+      return { label, update(dt){ t+=dt;
+        const push=Math.sin(t*0.7)*1.5;
+        defs.forEach(d=>{ d.position.x=push; });
+        offsideLine.position.x=push;
+        // 前锋始终比防线前
+        fwd.position.x=push+3;
+        // 防线前方前锋闪烁
+        offsideLine.material.opacity=0.4+0.6*Math.abs(Math.sin(t*3));
+        camera.position.x=-2+Math.sin(t*0.2)*2;
+        camera.lookAt(push,0,0);
+      }};
+    },
+
+    // ── 传中 ──
+    cross: () => {
+      const label = '传中 · Cross — 下底弧线传中';
+      const winger=makePlayer(0xff7828,0xffbb66); winger.position.set(6,0,5); scene.add(winger);
+      const cf=makePlayer(0x00cc66,0x88ffbb); cf.position.set(6.5,0,-1); scene.add(cf);
+      const def=makePlayer(0xff4466,0xffaaaa); def.position.set(6,0,0); scene.add(def);
+      const ball=makeBall(); scene.add(ball);
+      camera.position.set(-2,10,11); camera.lookAt(5,0,0);
+      let t=0,phase=0;
+      return { label, update(dt){ t+=dt; phase+=dt*0.5;
+        const p=(Math.sin(phase)+1)/2;
+        // 球从边路弧线飞入禁区
+        const sx=6,sz=5, ex=6.5,ez=-1;
+        const cx2=8.5,cz=2;
+        const bp=p;
+        ball.position.x=(1-bp)*(1-bp)*sx+2*(1-bp)*bp*cx2+bp*bp*ex;
+        ball.position.z=(1-bp)*(1-bp)*sz+2*(1-bp)*bp*cz+bp*bp*ez;
+        ball.position.y=0.26+2.5*Math.sin(bp*Math.PI);
+        ball.rotation.z+=dt*8;
+        // 中锋跳跃争顶
+        cf.position.y=0.4*Math.max(0,Math.sin((p-0.7)*Math.PI/0.3)) * (p>0.7?1:0);
+        // 边锋腿部摆动
+        const leg=0.3*Math.sin(t*2);
+        winger.userData.leg0.rotation.x=leg; winger.userData.leg1.rotation.x=-leg;
+        camera.position.y=9+Math.sin(t*0.2)*0.5;
+        camera.lookAt(5,1,0);
+      }};
+    },
+
+    // ── 直塞球 ──
+    'through-ball': () => {
+      const label = '直塞球 · Through Ball — 穿越防线直塞';
+      const passer=makePlayer(0x00aaff,0xaaddff); passer.position.set(-3,0,2); scene.add(passer);
+      const runner=makePlayer(0x00cc66,0x88ffbb); runner.position.set(0,0,-1); scene.add(runner);
+      const def1=makePlayer(0xff4466,0xffaaaa); def1.position.set(1.5,0,-0.5); scene.add(def1);
+      const def2=makePlayer(0xff4466,0xffaaaa); def2.position.set(1.5,0,1.5); scene.add(def2);
+      const ball=makeBall(); ball.position.set(-3,0.26,2); scene.add(ball);
+      // 防线虚线
+      const linePts=[new THREE.Vector3(1.5,0.05,-5),new THREE.Vector3(1.5,0.05,5)];
+      const defLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints(linePts),
+        new THREE.LineBasicMaterial({color:0xff4466,transparent:true,opacity:0.45}));
+      scene.add(defLine);
+      camera.position.set(-2,9,11); camera.lookAt(3,0,0);
+      let t=0,phase=0;
+      return { label, update(dt){ t+=dt; phase+=dt*0.45;
+        const p=(Math.sin(phase)+1)/2;
+        runner.position.x=lerp(-0.5,6,p);
+        runner.position.z=lerp(-1,-1.5,p);
+        const leg=0.4*Math.sin(t*4);
+        runner.userData.leg0.rotation.x=leg; runner.userData.leg1.rotation.x=-leg;
+        runner.rotation.y=-Math.PI/2;
+        // 传球时机：前锋越过防线后球出发
+        if(p>0.4){
+          const bp=(p-0.4)/0.6;
+          ball.position.x=lerp(-3,runner.position.x,bp);
+          ball.position.z=lerp(2,runner.position.z,bp);
+          ball.position.y=0.26+0.3*Math.sin(bp*Math.PI);
+          ball.rotation.z+=dt*6;
+        }
+        camera.position.x=runner.position.x*0.25;
+        camera.lookAt(runner.position.x+2,0,0);
+      }};
+    },
+
+    // ── 盘带过人 ──
+    dribble: () => {
+      const label = '盘带过人 · Dribbling — 变向速度突破';
+      const attacker=makePlayer(0xff7828,0xffbb66); attacker.position.set(-6,0,0); scene.add(attacker);
+      const defs=[];
+      [[-2,0,-1.5],[1,0,0.5],[4,0,-1]].forEach(p=>{
+        const d=makePlayer(0xff4466,0xffaaaa); d.position.set(...p); scene.add(d); defs.push(d);
+      });
+      const ball=makeBall(); scene.add(ball);
+      camera.position.set(0,8,12); camera.lookAt(0,0,-1);
+      // S形路径
+      const waypoints=[
+        {x:-6,z:0},{x:-3,z:-2},{x:0,z:1.5},{x:3,z:-1.5},{x:6,z:0}
+      ];
+      let t=0,seg=0,segT=0,SEG_DUR=0.9;
+      return { label, update(dt){ t+=dt; segT+=dt;
+        if(segT>=SEG_DUR){ segT=0; seg=(seg+1)%(waypoints.length-1); }
+        const pp=segT/SEG_DUR;
+        const wa=waypoints[seg], wb=waypoints[seg+1];
+        attacker.position.x=lerp(wa.x,wb.x,pp);
+        attacker.position.z=lerp(wa.z,wb.z,pp);
+        // 朝向下一点
+        attacker.rotation.y=Math.atan2(wb.x-wa.x,wb.z-wa.z);
+        ball.position.x=attacker.position.x+Math.sin(t*6)*0.2+0.3;
+        ball.position.z=attacker.position.z;
+        ball.position.y=0.26+0.1*Math.abs(Math.sin(t*6));
+        ball.rotation.z+=dt*8;
+        const leg=0.4*Math.sin(t*4);
+        attacker.userData.leg0.rotation.x=leg; attacker.userData.leg1.rotation.x=-leg;
+        camera.position.x=attacker.position.x*0.4;
+        camera.lookAt(attacker.position.x+2,0,attacker.position.z);
+      }};
+    },
+
+    // ── 点球 ──
+    penalty: () => {
+      const label = '点球 · Penalty Kick — 12码心理博弈';
+      // 球门在 x=8 方向，射手在 x=-3（约11米距离模拟12码）
+      const shooter = makePlayer(0xffcc00, 0xffee88);
+      shooter.position.set(-3, 0, 0);
+      shooter.rotation.y = Math.PI / 2; // 面向球门（+x方向）
+      scene.add(shooter);
+
+      const gkP = makePlayer(0xff7828, 0xffd580);
+      gkP.position.set(8, 0, 0);
+      gkP.rotation.y = -Math.PI / 2; // 面向射手
+      scene.add(gkP);
+
+      const ball = makeBall();
+      ball.position.set(-3, 0.26, 0);
+      scene.add(ball);
+
+      // 点球点标记
+      const dotGeo = new THREE.CircleGeometry(0.12, 12);
+      const dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff, opacity: 0.7, transparent: true });
+      const dot = new THREE.Mesh(dotGeo, dotMat);
+      dot.rotation.x = -Math.PI / 2;
+      dot.position.set(-3, 0.01, 0);
+      scene.add(dot);
+
+      // 相机：侧面稍高，能看到射手+球+球门全景
+      camera.position.set(-1, 5, 12);
+      camera.lookAt(3, 1, 0);
+
+      let t = 0, phase = 0;
+      // gkSide 决定门将扑救方向，每次射门随机
+      let gkSide = 1, shotSide = -1;
+      let nextShotDecided = false;
+
+      return { label, update(dt) {
+        t += dt; phase += dt * 0.38;
+        const cycleT = phase % 1;
+
+        // 每个周期开始时决定射向和门将方向
+        if (cycleT < 0.02 && !nextShotDecided) {
+          shotSide = Math.random() > 0.5 ? 1.2 : -1.2;
+          gkSide = Math.random() > 0.45 ? shotSide : -shotSide; // 有时扑对有时扑错
+          nextShotDecided = true;
+        }
+        if (cycleT > 0.1) nextShotDecided = false;
+
+        if (cycleT < 0.55) {
+          // 助跑/蓄力阶段：射手向球门方向小幅前进，腿部摆动
+          const runP = cycleT / 0.55;
+          shooter.position.x = -3 + runP * 0.8;
+          shooter.position.z = 0;
+          // 腿部跑动
+          const leg = 0.5 * Math.sin(t * 5);
+          shooter.userData.leg0.rotation.x = leg;
+          shooter.userData.leg1.rotation.x = -leg;
+          // 球静止在点球点
+          ball.position.set(-3, 0.26, 0);
+          ball.rotation.set(0, 0, 0);
+          // 门将原地等待，小幅摇摆
+          gkP.position.z = Math.sin(t * 1.8) * 0.6;
+          gkP.position.y = 0;
+        } else {
+          // 射门阶段（0.55~1.0）
+          const sp = (cycleT - 0.55) / 0.45;
+          // 球从点球点飞向球门角落
+          ball.position.x = -3 + sp * 11.5;
+          ball.position.z = shotSide * sp * 1.0;
+          // 低平球弧线（稍微离地）
+          ball.position.y = 0.26 + 1.2 * Math.sin(sp * Math.PI) * (1 - sp * 0.5);
+          ball.rotation.z += dt * 14;
+          // 门将扑救：快速向扑救侧滑动并俯身
+          gkP.position.z = gkSide * Math.min(sp * 4, 1.8);
+          gkP.position.y = Math.max(0, sp - 0.5) * 1.2;
+          gkP.rotation.z = gkSide * Math.min(sp * 1.5, 0.8);
+          // 射手射门后踢腿
+          shooter.userData.leg0.rotation.x = -0.8 * Math.min(sp * 3, 1);
+          shooter.userData.leg1.rotation.x = 0.3;
+        }
+
+        camera.position.x = -1 + Math.sin(t * 0.22) * 1.0;
+        camera.lookAt(3, 1.5, 0);
+      }};
+    },
+
+    // ── 越位规则 ──
+    offside: () => {
+      const label = '越位规则 · Offside — 传球瞬间越过倒数第二人';
+      const passer=makePlayer(0x00aaff,0xaaddff); passer.position.set(-4,0,0); scene.add(passer);
+      const fwd=makePlayer(0xffcc00,0xffee88); fwd.position.set(2,0,0); scene.add(fwd);
+      const lastDef=makePlayer(0xff4466,0xffaaaa); lastDef.position.set(1,0,2); scene.add(lastDef);
+      const gk=makePlayer(0xff7828,0xffbb66); gk.position.set(6,0,0); scene.add(gk);
+      const ball=makeBall(); ball.position.set(-4,0.26,0); scene.add(ball);
+      // 越位线（黄色）
+      const linePts=[new THREE.Vector3(1,0.05,-5.5),new THREE.Vector3(1,0.05,5.5)];
+      const offsideLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints(linePts),
+        new THREE.LineBasicMaterial({color:0xffcc00,transparent:true,opacity:0.8}));
+      scene.add(offsideLine);
+      // 球传出线（蓝色虚线）
+      camera.position.set(-2,9,11); camera.lookAt(2,0,0);
+      let t=0;
+      return { label, update(dt){ t+=dt;
+        // 前锋在越位线前方跑动
+        fwd.position.x=1.5+Math.sin(t*0.8)*1.0;
+        fwd.position.z=Math.cos(t*0.5)*1.5;
+        // 球在传球者和前锋之间
+        const bp=(Math.sin(t*1.2)+1)/2;
+        ball.position.x=lerp(-4,fwd.position.x,bp);
+        ball.position.z=lerp(0,fwd.position.z,bp);
+        ball.position.y=0.26+0.6*Math.sin(bp*Math.PI);
+        ball.rotation.z+=dt*5;
+        // 越位线闪烁
+        offsideLine.material.opacity=0.4+0.5*Math.abs(Math.sin(t*2));
+        offsideLine.material.color.setHex(fwd.position.x>1.05?0xff4466:0xffcc00);
+        camera.position.x=Math.sin(t*0.2)*3-1;
+        camera.lookAt(2,0,0);
+      }};
+    },
+
+    // ── 4-3-3 阵型 ──
+    'formation-433': () => {
+      const label = '4-3-3 阵型 · Formation — 控球+高压';
+      const positions=[
+        // GK
+        {x:-7.5,z:0,c:0xffcc00},{x:-5.5,z:-3.5,c:0xff4466},{x:-5.5,z:-1.2,c:0xff4466},
+        {x:-5.5,z:1.2,c:0xff4466},{x:-5.5,z:3.5,c:0xff4466},
+        // MF
+        {x:-1.5,z:-2.5,c:0x00aaff},{x:-1.5,z:0,c:0x00aaff},{x:-1.5,z:2.5,c:0x00aaff},
+        // FW
+        {x:3,z:-4,c:0x00cc66},{x:4,z:0,c:0x00cc66},{x:3,z:4,c:0x00cc66}
+      ];
+      const players=positions.map(p=>{
+        const pl=makePlayer(p.c,0xffffff); pl.position.set(p.x,0,p.z); scene.add(pl); return pl;
+      });
+      const ball=makeBall(); ball.position.set(-1.5,0.26,0); scene.add(ball);
+      camera.position.set(0,13,11); camera.lookAt(0,0,0);
+      let t=0;
+      return { label, update(dt){ t+=dt;
+        // 呼吸感
+        const breathe=1+0.03*Math.sin(t*0.8);
+        players.forEach((pl,i)=>{
+          pl.position.x=positions[i].x*breathe;
+          pl.position.z=positions[i].z*breathe;
+        });
+        // 球在中场传递
+        const cycle=(t*0.5)%(Math.PI*2);
+        ball.position.x=-1.5+Math.sin(cycle)*1.5;
+        ball.position.z=Math.cos(cycle)*2;
+        ball.rotation.y+=dt*3;
+        camera.position.x=Math.sin(t*0.15)*3;
+        camera.lookAt(0,0,0);
+      }};
+    },
+
+    // ── 4-4-2 阵型 ──
+    'formation-442': () => {
+      const label = '4-4-2 阵型 · Formation — 攻守均衡经典阵型';
+      const positions=[
+        {x:-7.5,z:0,c:0xffcc00},
+        {x:-5.5,z:-3.5,c:0xff4466},{x:-5.5,z:-1.2,c:0xff4466},{x:-5.5,z:1.2,c:0xff4466},{x:-5.5,z:3.5,c:0xff4466},
+        {x:-1.5,z:-3.5,c:0x00aaff},{x:-1.5,z:-1.2,c:0x00aaff},{x:-1.5,z:1.2,c:0x00aaff},{x:-1.5,z:3.5,c:0x00aaff},
+        {x:3.5,z:-1.5,c:0x00cc66},{x:3.5,z:1.5,c:0x00cc66}
+      ];
+      const players=positions.map(p=>{
+        const pl=makePlayer(p.c,0xffffff); pl.position.set(p.x,0,p.z); scene.add(pl); return pl;
+      });
+      const ball=makeBall(); ball.position.set(0,0.26,0); scene.add(ball);
+      camera.position.set(0,13,11); camera.lookAt(0,0,0);
+      let t=0;
+      return { label, update(dt){ t+=dt;
+        const breathe=1+0.03*Math.sin(t*0.8);
+        players.forEach((pl,i)=>{ pl.position.x=positions[i].x*breathe; pl.position.z=positions[i].z*breathe; });
+        ball.position.x=Math.sin(t*0.6)*3; ball.position.z=Math.cos(t*0.45)*2.5;
+        ball.rotation.y+=dt*2;
+        camera.position.x=Math.sin(t*0.15)*3;
+        camera.lookAt(0,0,0);
+      }};
+    },
+
+    // ── 门将 ──
+    gk: () => {
+      const label = '门将 · GK — 禁区最后防线';
+      const gkP=makePlayer(0xffcc00,0xffee88); gkP.position.set(7,0,0); scene.add(gkP);
+      const shooter=makePlayer(0x00aaff,0xaaddff); shooter.position.set(2,0,-1); scene.add(shooter);
+      const ball=makeBall(); scene.add(ball);
+      camera.position.set(2,7,11); camera.lookAt(6,1,0);
+      let t=0,phase=0;
+      return { label, update(dt){ t+=dt; phase+=dt*0.5;
+        const p=phase%1;
+        // 球飞向球门
+        ball.position.x=lerp(2,7.5,p);
+        ball.position.z=lerp(-1,Math.sin(phase*Math.PI*2)*1.5,p);
+        ball.position.y=0.26+1.8*Math.sin(p*Math.PI);
+        ball.rotation.z+=dt*8;
+        // 门将扑救
+        gkP.position.z=Math.sin(t*1.3)*2.5;
+        gkP.position.y=Math.abs(Math.sin(t*0.9))*0.5;
+        const arm=0.4*Math.sin(t*2);
+        gkP.userData.leg0.rotation.x=arm; gkP.userData.leg1.rotation.x=-arm;
+        camera.lookAt(6,1.5,0);
+      }};
+    },
+
+    // ── 中后卫 ──
+    cb: () => {
+      const label = '中后卫 · CB — 保护禁区·制空权';
+      const cb1=makePlayer(0xff4466,0xffaaaa); cb1.position.set(4,0,-1.5); scene.add(cb1);
+      const cb2=makePlayer(0xff4466,0xffaaaa); cb2.position.set(4,0,1.5); scene.add(cb2);
+      const fwd=makePlayer(0x00cc66,0x88ffbb); fwd.position.set(2,0,0); scene.add(fwd);
+      const ball=makeBall(); scene.add(ball);
+      camera.position.set(-1,9,12); camera.lookAt(3,0,0);
+      let t=0;
+      return { label, update(dt){ t+=dt;
+        // 高空球弧线
+        const p=(Math.sin(t*0.8)+1)/2;
+        ball.position.x=lerp(-4,4,p);
+        ball.position.y=0.26+3.5*Math.sin(p*Math.PI);
+        ball.position.z=Math.sin(t*0.4)*1;
+        ball.rotation.z+=dt*5;
+        // 后卫跳跃争顶
+        cb1.position.y=0.6*Math.max(0,Math.sin((p-0.7)*Math.PI/0.3))*(p>0.7?1:0);
+        cb2.position.y=0.4*Math.max(0,Math.sin((p-0.75)*Math.PI/0.25))*(p>0.75?1:0);
+        fwd.position.x=2+Math.sin(t*0.7)*1.5;
+        camera.position.x=-1+Math.sin(t*0.2)*2;
+        camera.lookAt(3,1,0);
+      }};
+    },
+
+    // ── 边锋 ──
+    winger: () => {
+      const label = '边锋 · Winger — 速度突破·内切射门';
+      const wng=makePlayer(0xff7828,0xffbb66); wng.position.set(-5,0,-4); scene.add(wng);
+      const def=makePlayer(0xff4466,0xffaaaa); def.position.set(-1,0,-3.5); scene.add(def);
+      const ball=makeBall(); scene.add(ball);
+      camera.position.set(0,8,12); camera.lookAt(2,0,-2);
+      let t=0,seg=0,segT=0;
+      const path=[{x:-5,z:-4},{x:-2,z:-3.8},{x:1,z:-2},{x:4,z:0},{x:6,z:1}];
+      return { label, update(dt){ t+=dt; segT+=dt;
+        const SEG_DUR=0.8;
+        if(segT>=SEG_DUR){ segT=0; seg=(seg+1)%(path.length-1); }
+        const pp=segT/SEG_DUR;
+        const wa=path[seg], wb=path[seg+1];
+        wng.position.x=lerp(wa.x,wb.x,pp); wng.position.z=lerp(wa.z,wb.z,pp);
+        wng.rotation.y=Math.atan2(wb.x-wa.x,wb.z-wa.z);
+        ball.position.x=wng.position.x+0.4; ball.position.z=wng.position.z;
+        ball.position.y=0.26+0.12*Math.abs(Math.sin(t*8));
+        ball.rotation.z+=dt*10;
+        const leg=0.4*Math.sin(t*5);
+        wng.userData.leg0.rotation.x=leg; wng.userData.leg1.rotation.x=-leg;
+        camera.position.x=wng.position.x*0.3;
+        camera.lookAt(wng.position.x+3,0,wng.position.z);
+      }};
+    },
+
+    // ── 中锋 ──
+    cf: () => {
+      const label = '中锋 · CF — 禁区嗅觉·背身拿球';
+      const striker=makePlayer(0x00cc66,0x88ffbb); striker.position.set(3,0,0); scene.add(striker);
+      const def=makePlayer(0xff4466,0xffaaaa); def.position.set(4,0,0.5); scene.add(def);
+      const am=makePlayer(0x00aaff,0xaaddff); am.position.set(0,0,1); scene.add(am);
+      const ball=makeBall(); scene.add(ball);
+      camera.position.set(-2,8,11); camera.lookAt(4,0,0);
+      let t=0;
+      return { label, update(dt){ t+=dt;
+        // 中锋背身拿球再转身射门
+        const cycle=t*0.5%( Math.PI*2);
+        striker.position.x=3+Math.sin(cycle)*1.2;
+        striker.position.z=Math.cos(cycle*0.7)*1.5;
+        striker.rotation.y=cycle+Math.PI;
+        ball.position.x=striker.position.x-0.4*Math.cos(cycle);
+        ball.position.z=striker.position.z-0.4*Math.sin(cycle);
+        ball.position.y=0.26;
+        ball.rotation.y+=dt*4;
+        const leg=0.3*Math.sin(t*2.5);
+        striker.userData.leg0.rotation.x=leg; striker.userData.leg1.rotation.x=-leg;
+        camera.position.x=-2+Math.sin(t*0.2)*2;
+        camera.lookAt(striker.position.x,0.5,striker.position.z);
+      }};
+    },
+
+    // ── 假9号 ──
+    false9: () => {
+      const label = '假9号 · False 9 — 回撤诱出后卫制造空间';
+      const f9=makePlayer(0x00d4ff,0xaaeeff); f9.position.set(3,0,0); scene.add(f9);
+      const cb_def=makePlayer(0xff4466,0xffaaaa); cb_def.position.set(4,0,0); scene.add(cb_def);
+      const mid1=makePlayer(0x00cc66,0x88ffbb); mid1.position.set(-1,0,-2); scene.add(mid1);
+      const mid2=makePlayer(0x00cc66,0x88ffbb); mid2.position.set(-1,0,2); scene.add(mid2);
+      const ball=makeBall(); scene.add(ball);
+      camera.position.set(-2,9,11); camera.lookAt(2,0,0);
+      let t=0;
+      return { label, update(dt){ t+=dt;
+        // 假9号回撤
+        const pullBack=Math.sin(t*0.7)*2;
+        f9.position.x=3-pullBack;
+        // 后卫跟出
+        cb_def.position.x=4-pullBack*0.7;
+        // 插上跑者利用身后空间
+        mid1.position.x=-1+Math.max(0,pullBack)*1.2;
+        mid2.position.x=-1+Math.max(0,pullBack)*1.1;
+        ball.position.x=f9.position.x-0.5;
+        ball.position.y=0.26;
+        ball.rotation.y+=dt*3;
+        camera.position.x=Math.sin(t*0.25)*3;
+        camera.lookAt(2,0,0);
+      }};
+    },
+
+    // ── 铲球 ──
+    tackle: () => {
+      const label = '铲球 · Tackle — 飞铲断球';
+      const tackler=makePlayer(0xff4466,0xffaaaa); tackler.position.set(-2,0,1); scene.add(tackler);
+      const attacker=makePlayer(0x00cc66,0x88ffbb); attacker.position.set(1,0,0); scene.add(attacker);
+      const ball=makeBall(); ball.position.set(1.3,0.26,0); scene.add(ball);
+      camera.position.set(-1,7,10); camera.lookAt(0,0,0);
+      let t=0,phase=0;
+      return { label, update(dt){ t+=dt; phase+=dt*0.5;
+        const p=phase%1;
+        // 铲球者滑铲
+        tackler.position.x=lerp(-2,0.5,p);
+        tackler.position.z=lerp(1,0,p);
+        tackler.rotation.z=p*0.6; // 侧倒
+        tackler.position.y=-p*0.5; // 下滑铲球
+        const leg=0.5*Math.sin(t*3);
+        tackler.userData.leg0.rotation.x=leg*2; tackler.userData.leg1.rotation.x=0.3;
+        // 球被铲走
+        if(p>0.6){
+          const sp=(p-0.6)/0.4;
+          ball.position.x=lerp(1.3,3.5,sp);
+          ball.position.z=lerp(0,-2,sp);
+          ball.position.y=0.26+1.2*Math.sin(sp*Math.PI);
+        }
+        camera.position.x=Math.sin(t*0.3)*2;
+        camera.lookAt(0,0.3,0);
+      }};
+    },
+
+    // ── 头球 ──
+    header: () => {
+      const label = '头球 · Header — 传中球精准落于头顶';
+      // 主攻头球球员（绿队）
+      const p1=makePlayer(0x00cc66,0x88ffbb); p1.position.set(2,0,-0.8); scene.add(p1);
+      // 防守争顶（红队）
+      const p2=makePlayer(0xff4466,0xffaaaa); p2.position.set(2.3,0,0.9); scene.add(p2);
+      // 传中球员
+      const crosser=makePlayer(0x00aaff,0xaaddff); crosser.position.set(7,0,4.5); scene.add(crosser);
+      const ball=makeBall(); scene.add(ball);
+
+      // 头球接触时的光晕圆环（绿色）
+      const ringGeo = new THREE.TorusGeometry(0.45, 0.06, 8, 24);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0 });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      scene.add(ring);
+
+      camera.position.set(-2,8,12); camera.lookAt(2,2.5,0);
+      let t=0;
+      // makePlayer 头部中心静止时 y=2.10，跳起 1.05 后头部 y≈3.15
+      const HEAD_H = 3.15; // 球与头接触时的高度
+      const CYCLE = 3.0;   // 动画循环周期(秒)
+      return { label, update(dt){ t+=dt;
+        const phase = (t % CYCLE) / CYCLE; // 0→1 线性循环
+
+        // ── 球的飞行路径 ──
+        // 阶段0~0.7：球从传中球员 x=7,z=4.5 飞向攻手头顶 x=2,z=-0.8
+        // 阶段0.7~1：球打完头球后继续飞出（向球门方向 x=-2）
+        let ballX, ballZ, ballY;
+        if (phase < 0.7) {
+          const fp = phase / 0.7; // 0→1
+          ballX = lerp(7, 2, fp);
+          ballZ = lerp(4.5, -0.8, fp);
+          // 标准对称抛物线：fp=0 时 y=0.26（地面），fp=0.5 时峰值=HEAD_H，fp=1 时 y=HEAD_H（头部接触）
+          // 让球在 fp=1 精确落到头顶，用半段抛物线：y = HEAD_H * sin(fp * PI/2) + 0.26*(1-sin(fp*PI/2)) 不够直观
+          // 改用：从地面出发，峰值比目标更高，在 fp→1 时降到 HEAD_H
+          // 采用两段：fp<0.45 上升到 HEAD_H+0.4，fp>0.45 下降至 HEAD_H
+          if (fp < 0.45) {
+            ballY = lerp(0.26, HEAD_H + 0.4, fp / 0.45);
+          } else {
+            ballY = lerp(HEAD_H + 0.4, HEAD_H, (fp - 0.45) / 0.55);
+          }
+        } else {
+          const fp = (phase - 0.7) / 0.3; // 0→1（头球后飞出）
+          ballX = lerp(2, -3, fp);
+          ballZ = lerp(-0.8, -0.8, fp);
+          // 头球后有向下弧线
+          ballY = Math.max(0.26, HEAD_H * (1 - fp * fp * 1.2));
+        }
+        ball.position.set(ballX, ballY, ballZ);
+        ball.rotation.z += dt * 7;
+        ball.rotation.x += dt * 4;
+
+        // ── 球员跳跃 ──
+        // p1（绿队）在 phase≈0.68 时头部恰好在 HEAD_H
+        // 需要 p1.y + 2.10 = HEAD_H => p1.y = 1.05 在 phase=0.68 时
+        const jumpPhase = 0.68;
+        const jumpWindow = 0.18;
+        const jumpNorm = Math.max(0, 1 - Math.abs(phase - jumpPhase) / jumpWindow);
+        const jumpH1 = 1.05 * Math.sin(jumpNorm * Math.PI);
+        p1.position.y = jumpH1;
+        // p2（红队）稍偏，晚一点
+        const jumpNorm2 = Math.max(0, 1 - Math.abs(phase - (jumpPhase + 0.04)) / (jumpWindow * 0.9));
+        const jumpH2 = 0.85 * Math.sin(jumpNorm2 * Math.PI);
+        p2.position.y = jumpH2;
+
+        // ── 接触判定：ball.y 与 p1 头部 y 差值小于 0.28 时显示光晕 ──
+        const headWorldY = p1.position.y + 2.10;
+        const contactDist = Math.abs(ball.position.y - headWorldY) + Math.abs(ball.position.x - p1.position.x) * 0.5;
+        const contactIntensity = Math.max(0, 1 - contactDist / 0.35);
+        ring.position.set(p1.position.x, headWorldY, p1.position.z);
+        ring.rotation.x = Math.PI / 2;
+        ring.rotation.z = t * 3;
+        ringMat.opacity = contactIntensity * 0.95;
+        ring.scale.setScalar(1 + contactIntensity * 0.5);
+
+        // 传中球员挥臂
+        crosser.userData.arm0.rotation.z = -0.6 - 0.4 * Math.abs(Math.sin(t * 1.2));
+        crosser.userData.arm1.rotation.z = 0.6 + 0.4 * Math.abs(Math.sin(t * 1.2));
+
+        camera.position.x = -1 + Math.sin(t * 0.18) * 2.5;
+        camera.lookAt(2, 2.8, 0);
+      }};
+    },
+
+    // ── 角球 ──
+    corner: () => {
+      const label = '角球 · Corner Kick — 定位球传中攻门';
+      // 角球主罚球员（左侧角旗区）
+      const kicker = makePlayer(0x00aaff, 0xaaddff);
+      kicker.position.set(-8.5, 0, -5);
+      kicker.rotation.y = Math.atan2(8, 5); // 朝向禁区中路
+      scene.add(kicker);
+
+      // 禁区内3名进攻球员
+      const posAtk = [{x:1,z:-2},{x:-0.5,z:0},{x:2,z:1.5}];
+      const attackers = posAtk.map(p => {
+        const pl = makePlayer(0x00cc66, 0x88ffbb);
+        pl.position.set(p.x, 0, p.z); scene.add(pl); return pl;
+      });
+      // 2名防守球员
+      const posDef = [{x:0.5,z:-1.2},{x:1.5,z:0.8}];
+      const defenders = posDef.map(p => {
+        const pl = makePlayer(0xff4466, 0xffaaaa);
+        pl.position.set(p.x, 0, p.z); scene.add(pl); return pl;
+      });
+      // 门将
+      const gkP = makePlayer(0xffcc00, 0xffee88);
+      gkP.position.set(-7, 0, 0);
+      scene.add(gkP);
+
+      const ball = makeBall();
+      ball.position.set(-8.5, 0.26, -5);
+      scene.add(ball);
+
+      // 角旗（黄色）
+      const flagPole = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.04, 0.04, 1.5, 6),
+        new THREE.MeshLambertMaterial({ color: 0xffcc00 })
+      );
+      flagPole.position.set(-8.5, 0.75, -5.3);
+      scene.add(flagPole);
+      const flagGeo = new THREE.PlaneGeometry(0.5, 0.3);
+      const flagMat = new THREE.MeshBasicMaterial({ color: 0xffcc00, side: THREE.DoubleSide });
+      const flag = new THREE.Mesh(flagGeo, flagMat);
+      flag.position.set(-8.25, 1.45, -5.3);
+      scene.add(flag);
+
+      // 头球接触光晕
+      const ringGeo2 = new THREE.TorusGeometry(0.42, 0.055, 8, 20);
+      const ringMat2 = new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0 });
+      const ring2 = new THREE.Mesh(ringGeo2, ringMat2);
+      scene.add(ring2);
+
+      camera.position.set(-10, 8, 10);
+      camera.lookAt(-2, 1.5, -1);
+
+      let t = 0, phase = 0;
+      const CYCLE = 4.5; // 单次动画周期（秒）
+      // 目标落点（内旋角球，落向前点）
+      const target = { x: 0.5, z: -1.5 };
+      const HEAD_HT = 3.0;
+
+      return { label, update(dt) {
+        t += dt; phase = (phase + dt) % CYCLE;
+        const p = phase / CYCLE; // 0~1
+
+        if (p < 0.25) {
+          // 助跑蓄力：球静止，主罚球员原地摆腿
+          ball.position.set(-8.5, 0.26, -5);
+          const legSwing = 0.4 * Math.sin(t * 5);
+          kicker.userData.leg0.rotation.x = legSwing;
+          kicker.userData.leg1.rotation.x = -legSwing;
+        } else {
+          // 球飞出（0.25~0.75）：弧线传入禁区
+          const fp = Math.min((p - 0.25) / 0.5, 1);
+          const curve = Math.sin(fp * Math.PI);
+          ball.position.x = lerp(-8.5, target.x, fp);
+          ball.position.z = lerp(-5, target.z, fp);
+          // 内旋弧线高度，峰值在 fp=0.45
+          const peakFp = 0.45;
+          ball.position.y = Math.max(0.26, HEAD_HT * (1 - ((fp - peakFp) / peakFp) * ((fp - peakFp) / peakFp)));
+          ball.rotation.z += dt * 10;
+          ball.rotation.x += dt * 5;
+
+          // 进攻球员跑位+跳跃
+          attackers.forEach((pl, i) => {
+            const moveP = Math.min(fp * 1.5, 1);
+            pl.position.x = posAtk[i].x + Math.sin(t * 0.7 + i) * 0.5;
+            pl.position.z = posAtk[i].z + Math.cos(t * 0.6 + i) * 0.4;
+            // 第0个攻手在 fp≈0.45 时跳跃头球
+            if (i === 0) {
+              const jumpP = Math.max(0, Math.sin((fp - 0.35) * Math.PI / 0.3)) * (fp > 0.35 && fp < 0.65 ? 1 : 0);
+              pl.position.y = jumpP * 1.05;
+              // 接触光晕
+              const cd = Math.abs(fp - peakFp);
+              const ci = Math.max(0, 1 - cd / 0.07);
+              ring2.position.set(pl.position.x, pl.position.y + 2.10, pl.position.z);
+              ring2.rotation.x = Math.PI / 2;
+              ring2.rotation.z = t * 3;
+              ringMat2.opacity = ci * 0.85;
+              ring2.scale.setScalar(1 + ci * 0.35);
+            } else {
+              pl.position.y = 0;
+            }
+          });
+          // 防守球员也跳跃
+          defenders.forEach((pl, i) => {
+            pl.position.x = posDef[i].x + Math.sin(t * 0.8 + i * 1.3) * 0.3;
+            pl.position.z = posDef[i].z;
+            pl.position.y = 0.4 * Math.max(0, Math.sin((fp - 0.4) * Math.PI / 0.3)) * (fp > 0.4 && fp < 0.7 ? 1 : 0);
+          });
+          // 门将移动扑救
+          gkP.position.z = Math.sin(t * 1.0) * 1.2;
+        }
+        // 旗子飘动
+        flag.rotation.y = Math.sin(t * 2) * 0.3;
+        camera.position.x = -10 + Math.sin(t * 0.2) * 1.5;
+        camera.lookAt(-2, 2, -1);
+      }};
+    },
+
+    // ── 手球 ──
+    handball: () => {
+      const label = '手球 · Handball — 手臂触球违规判罚';
+      // 球员（防守方）
+      const player = makePlayer(0x4488ff, 0xaaccff);
+      player.position.set(0, 0, 0);
+      scene.add(player);
+
+      // 射击方（进攻）
+      const shooter = makePlayer(0x00cc66, 0x88ffbb);
+      shooter.position.set(-4, 0, 0);
+      shooter.rotation.y = Math.PI / 2;
+      scene.add(shooter);
+
+      const ball = makeBall();
+      ball.position.set(-4, 0.8, 0);
+      scene.add(ball);
+
+      // ── 红色感叹号 ──（由两部分组成）
+      // 竖条
+      const barGeo = new THREE.BoxGeometry(0.18, 0.55, 0.12);
+      const excMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
+      const excBar = new THREE.Mesh(barGeo, excMat);
+      // 点
+      const dotGeo = new THREE.SphereGeometry(0.11, 8, 8);
+      const excDot = new THREE.Mesh(dotGeo, excMat.clone());
+      // 容器 group
+      const excGroup = new THREE.Group();
+      excBar.position.y = 0.35;
+      excGroup.add(excBar);
+      excDot.position.y = -0.12;
+      excGroup.add(excDot);
+      excGroup.visible = false;
+      scene.add(excGroup);
+
+      // 黄牌图标（扁平矩形，黄色）
+      const cardGeo = new THREE.BoxGeometry(0.3, 0.42, 0.04);
+      const cardMat = new THREE.MeshBasicMaterial({ color: 0xffdd00 });
+      const cardMesh = new THREE.Mesh(cardGeo, cardMat);
+      cardMesh.visible = false;
+      scene.add(cardMesh);
+
+      // 手臂"扩大区域"高亮圆圈（红色半透明）
+      const armCircGeo = new THREE.TorusGeometry(0.5, 0.06, 8, 24);
+      const armCircMat = new THREE.MeshBasicMaterial({ color: 0xff3333, transparent: true, opacity: 0 });
+      const armCircle = new THREE.Mesh(armCircGeo, armCircMat);
+      scene.add(armCircle);
+
+      camera.position.set(-2, 6, 10);
+      camera.lookAt(0, 1.5, 0);
+
+      let t = 0, phase = 0;
+      const CYCLE = 4.0;
+      // 随机：有时手臂高于肩（违规），有时正常
+      let isViolation = true;
+      let handY = 2.0; // 手臂触球高度 - 高于肩（1.84）为违规
+
+      return { label, update(dt) {
+        t += dt; phase = (phase + dt) % CYCLE;
+        const p = phase / CYCLE; // 0~1
+
+        // 每个周期开始时切换违规/合规
+        if (p < dt * 2) {
+          isViolation = !isViolation;
+          handY = isViolation ? 2.15 : 1.35; // 高于肩(违规) vs 低于腰(合规)
+        }
+
+        // 球飞向防守球员手臂
+        const ballFly = Math.min(p / 0.5, 1); // 前半段球飞行
+        ball.position.x = lerp(-4, 0.35, ballFly);
+        ball.position.y = lerp(0.8, handY, ballFly) + 0.3 * Math.sin(ballFly * Math.PI);
+        ball.position.z = 0;
+        ball.rotation.z += dt * 12;
+
+        // 防守球员：手臂随违规状态展开
+        const armAngle = isViolation
+          ? 1.0 + 0.3 * Math.sin(t * 1.5)   // 违规：手臂高举扩大
+          : 0.2 + 0.1 * Math.sin(t * 1.5);  // 合规：手臂贴身
+        player.userData.arm0.rotation.z = -(armAngle);
+        player.userData.arm1.rotation.z = (armAngle);
+        player.userData.arm0.rotation.x = isViolation ? -0.5 : 0.1;
+        player.userData.arm1.rotation.x = isViolation ? -0.5 : 0.1;
+
+        // 球员轻微跳跃（防守动作）
+        player.position.y = 0.15 * Math.abs(Math.sin(t * 1.8)) * (p > 0.2 && p < 0.7 ? 1 : 0);
+
+        // 手臂圆圈高亮（违规时红色，合规时绿色）
+        const armWorldX = 0 + (isViolation ? 0.38 : 0.25);
+        const armWorldY = player.position.y + handY;
+        armCircle.position.set(armWorldX, armWorldY, 0.05);
+        armCircle.rotation.y = Math.PI / 2;
+        armCircMat.color.setHex(isViolation ? 0xff2222 : 0x00ff88);
+        armCircMat.opacity = isViolation ? 0.55 + 0.2 * Math.sin(t * 4) : 0.3;
+
+        // 球接触手臂时（p ≈ 0.5）
+        const contactP = Math.abs(p - 0.5);
+        const contactIntensity = Math.max(0, 1 - contactP / 0.07);
+
+        if (isViolation) {
+          // 违规：感叹号显示，球员胸口位置
+          excGroup.visible = contactIntensity > 0.05;
+          excGroup.position.set(0.8, player.position.y + 2.8, 0);
+          excGroup.scale.setScalar(0.8 + contactIntensity * 0.7);
+          // 感叹号颜色闪烁
+          const flashColor = contactIntensity > 0.3 ? 0xff2222 : 0xff6644;
+          excMat.color.setHex(flashColor);
+          excGroup.rotation.y = Math.sin(t * 8) * (contactIntensity * 0.15);
+
+          // 黄牌在接触后出现
+          cardMesh.visible = p > 0.55 && p < 0.88;
+          cardMesh.position.set(1.5, player.position.y + 2.6, 0.2);
+          cardMesh.rotation.z = Math.sin(t * 2) * 0.12;
+          cardMesh.scale.setScalar(0.7 + 0.3 * Math.max(0, Math.sin((p - 0.55) * Math.PI / 0.15)));
+        } else {
+          // 合规：感叹号和黄牌不显示
+          excGroup.visible = false;
+          cardMesh.visible = false;
+        }
+
+        // 射手踢球动作
+        shooter.userData.leg0.rotation.x = -0.6 * Math.sin(t * 3);
+        shooter.userData.leg1.rotation.x = 0.5 * Math.sin(t * 3);
+
+        camera.position.x = -1.5 + Math.sin(t * 0.22) * 1.5;
+        camera.lookAt(0, 1.8, 0);
+      }};
+    },
+
+    // ── 3-5-2 阵型 ──
+    'formation-352': () => {
+      const label = '3-5-2 阵型 · Formation — 三中卫+双翼卫+双前锋';
+      // 球员位置：3后卫 + 5中场（2翼卫+3中场）+ 2前锋
+      const positions = [
+        // GK
+        { x: -7.5, z: 0,    c: 0xffcc00, role: 'gk' },
+        // 3 CB
+        { x: -5.0, z: -2.2, c: 0xff4466, role: 'cb' },
+        { x: -5.0, z:  0,   c: 0xff4466, role: 'cb' },
+        { x: -5.0, z:  2.2, c: 0xff4466, role: 'cb' },
+        // 2 WB (翼卫)
+        { x: -1.5, z: -4.2, c: 0xff7828, role: 'wb' },
+        { x: -1.5, z:  4.2, c: 0xff7828, role: 'wb' },
+        // 3 CM
+        { x: -1.5, z: -1.5, c: 0x00aaff, role: 'cm' },
+        { x: -1.5, z:  0,   c: 0x00aaff, role: 'cm' },
+        { x: -1.5, z:  1.5, c: 0x00aaff, role: 'cm' },
+        // 2 FW
+        { x:  3.5, z: -1.2, c: 0x00cc66, role: 'fw' },
+        { x:  3.5, z:  1.2, c: 0x00cc66, role: 'fw' },
+      ];
+      const players = positions.map(p => {
+        const pl = makePlayer(p.c, 0xffffff);
+        pl.position.set(p.x, 0, p.z);
+        scene.add(pl);
+        return pl;
+      });
+
+      // 翼卫攻守切换路径（index 4,5 是两个翼卫）
+      const wbAttackPos = [
+        { x: 2.5, z: -4.5 }, // 左翼卫插上
+        { x: 2.5, z:  4.5 }, // 右翼卫插上
+      ];
+      const wbDefPos = [
+        { x: -1.5, z: -4.2 },
+        { x: -1.5, z:  4.2 },
+      ];
+
+      const ball = makeBall();
+      ball.position.set(0, 0.26, 0);
+      scene.add(ball);
+
+      // 阵型线（橙色，连接三中卫）
+      const lineMat3 = new THREE.LineBasicMaterial({ color: 0xff7828, transparent: true, opacity: 0.5 });
+      function addFormLine(pts){ scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat3)); }
+
+      // 切换动画状态
+      camera.position.set(0, 14, 11);
+      camera.lookAt(0, 0, 0);
+
+      let t = 0;
+      let wbPhase = 0; // 翼卫攻守循环
+
+      return { label, update(dt) {
+        t += dt;
+        wbPhase = (wbPhase + dt * 0.35) % (Math.PI * 2);
+
+        // 全队"呼吸"感
+        const breathe = 1 + 0.025 * Math.sin(t * 0.7);
+
+        players.forEach((pl, i) => {
+          const pos = positions[i];
+
+          if (pos.role === 'wb') {
+            // 翼卫：来回在攻守位置之间移动，模拟覆盖整条边路
+            const wbIdx = pos.z < 0 ? 0 : 1;
+            const wbT = (Math.sin(wbPhase + wbIdx * Math.PI) + 1) / 2; // 0~1
+            const atk = wbAttackPos[wbIdx];
+            const def = wbDefPos[wbIdx];
+            pl.position.x = lerp(def.x, atk.x, wbT) * breathe;
+            pl.position.z = lerp(def.z, atk.z, wbT);
+            // 跑动腿部动作
+            const legSwing = 0.4 * Math.sin(t * 4 + wbIdx);
+            pl.userData.leg0.rotation.x = legSwing;
+            pl.userData.leg1.rotation.x = -legSwing;
+          } else if (pos.role === 'fw') {
+            // 前锋：小幅抢点跑位
+            pl.position.x = pos.x * breathe + Math.sin(t * 0.9 + i) * 0.8;
+            pl.position.z = pos.z + Math.cos(t * 0.7 + i) * 0.6;
+          } else {
+            // 其他：呼吸晃动
+            pl.position.x = pos.x * breathe;
+            pl.position.z = pos.z * breathe;
+          }
+        });
+
+        // 球在中场和前场之间流转（走三角传球）
+        const ballCycle = (t * 0.55) % (Math.PI * 2);
+        ball.position.x = -0.5 + Math.sin(ballCycle) * 3.5;
+        ball.position.z = Math.cos(ballCycle * 0.8) * 3;
+        ball.position.y = 0.26 + 0.08 * Math.abs(Math.sin(t * 5));
+        ball.rotation.y += dt * 2.5;
+
+        // 翼卫插上时用橙色光晕标记
+        [4, 5].forEach((idx, wi) => {
+          const wbT2 = (Math.sin(wbPhase + wi * Math.PI) + 1) / 2;
+          if (wbT2 > 0.6) {
+            players[idx].userData.leg0.rotation.z = 0.15 * wbT2;
+            players[idx].userData.leg1.rotation.z = -0.15 * wbT2;
+          }
+        });
+
+        camera.position.x = Math.sin(t * 0.12) * 3;
+        camera.position.y = 14 - Math.sin(t * 0.08) * 1;
+        camera.lookAt(0, 0, 0);
+      }};
+    },
+  };
+
+  // 创建场景并启动
+  const sceneFn = scenes3d[id] || scenes3d['pressing'];
+  const sceneCtrl = sceneFn();
+  if(labelEl) labelEl.textContent = sceneCtrl.label || '';
+
+  // 相机慢旋转基准（部分场景内部控制，这里作为后备）
+  let prevTime = performance.now();
+
+  function animate(){
+    const now = performance.now();
+    const dt = Math.min((now - prevTime) / 1000, 0.05);
+    prevTime = now;
+    sceneCtrl.update(dt);
+    renderer.render(scene, camera);
+    _3d.raf = requestAnimationFrame(animate);
+  }
+
+  function dispose(){
+    renderer.dispose();
+    scene.traverse(obj => {
+      if(obj.geometry) obj.geometry.dispose();
+      if(obj.material){
+        if(Array.isArray(obj.material)) obj.material.forEach(m=>m.dispose());
+        else obj.material.dispose();
+      }
+    });
+    if(renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
+  }
+
+  _3d = { renderer, scene, camera, raf: null, dispose };
+  animate();
+}
+
+document.getElementById('modal').addEventListener('click', e => {
+  if(e.target === document.getElementById('modal')) closeModal();
+});
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeModal(); });
+
+// cat-bar 点击事件（在脚本末尾绑定，确保 DOM 和所有函数已就绪）
+(function bindCatBar(){
+  var bar = document.getElementById('cat-bar');
+  if(!bar){ console.error('[KG] cat-bar not found'); return; }
+  bar.addEventListener('click', function(e){
+    var btn = e.target.closest ? e.target.closest('.cat-btn') : null;
+    if(!btn){
+      // 兼容不支持 closest 的环境：向上找 cat-btn
+      var el = e.target;
+      while(el && el !== bar){
+        if(el.classList && el.classList.contains('cat-btn')){ btn = el; break; }
+        el = el.parentElement;
+      }
+    }
+    if(!btn) return;
+    var cat = btn.getAttribute('data-cat');
+    if(cat) switchCat(cat);
+  });
+  console.log('[KG] cat-bar event bound OK');
+})();
+
+
+
+</script>
+</body>
+</html>

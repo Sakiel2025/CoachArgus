@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - 足球智能追踪与运动评估系统</title>
+    <link rel="icon" href="logo-football.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #00ff88;
+            --primary-dark: #00cc70;
+            --accent: #00d4ff;
+            --bg-dark: #071020;
+            --bg-card: rgba(17,24,39,0.92);
+            --bg-border: rgba(0,255,136,0.18);
+            --text-primary: #e8eaf6;
+            --text-dim: rgba(232,234,246,0.5);
+            --nav-h: 56px;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        }
+
+        /* ── 自定义滚动条 ── */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0,255,136,0.25); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(0,255,136,0.45); }
+        * { scrollbar-width: thin; scrollbar-color: rgba(0,255,136,0.25) transparent; }
+
+        /* ═══════════════════════════════════════
+           顶部导航栏
+        ═══════════════════════════════════════ */
+        .top-nav {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: var(--nav-h);
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            padding: 0 32px;
+            gap: 0;
+            background: rgba(7,16,32,0.88);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(0,255,136,0.10);
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: var(--primary);
+            letter-spacing: 0.5px;
+            text-decoration: none;
+            margin-right: 32px;
+            white-space: nowrap;
+        }
+        .nav-brand img { width: 28px; height: 28px; }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex: 1;
+        }
+
+        .nav-btn {
+            background: none;
+            border: none;
+            color: rgba(232,234,246,0.70);
+            font-size: 0.88rem;
+            padding: 6px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: color 0.2s, background 0.2s;
+            white-space: nowrap;
+        }
+        .nav-btn:hover,
+        .nav-btn.active {
+            color: var(--primary);
+            background: rgba(0,255,136,0.08);
+        }
+
+        /* 登录按钮高亮 */
+        .nav-login-btn {
+            margin-left: auto;
+            background: rgba(0,255,136,0.12);
+            border: 1px solid rgba(0,255,136,0.35);
+            color: var(--primary);
+            font-size: 0.88rem;
+            padding: 6px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+        .nav-login-btn:hover {
+            background: rgba(0,255,136,0.22);
+            box-shadow: 0 0 12px rgba(0,255,136,0.25);
+        }
+
+        /* 功能介绍下拉面板 */
+        .dropdown-wrap {
+            position: relative;
+            height: 100%;
+            display: flex;
+            align-items: center;
+        }
+        .dropdown-panel {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            min-width: 320px;
+            background: rgba(10,18,35,0.97);
+            border: 1px solid rgba(0,255,136,0.18);
+            border-radius: 0 0 12px 12px;
+            padding: 12px 18px 18px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+            z-index: 300;
+        }
+        .dropdown-wrap:hover .dropdown-panel { display: block; }
+        .dropdown-panel h4 {
+            color: var(--primary);
+            font-size: 0.85rem;
+            margin-bottom: 12px;
+            letter-spacing: 1px;
+        }
+        .feat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .feat-card {
+            background: rgba(0,255,136,0.05);
+            border: 1px solid rgba(0,255,136,0.12);
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            transition: border-color 0.2s;
+        }
+        .feat-card:hover { border-color: rgba(0,255,136,0.35); color: var(--text-primary); }
+        .feat-card i { color: var(--primary); margin-right: 6px; }
+
+        /* AI应用 下拉面板 */
+        .ai-panel {
+            min-width: 260px;
+        }
+        .ai-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 9px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 0.82rem;
+            color: var(--text-dim);
+        }
+        .ai-item:last-child { border-bottom: none; }
+        .ai-item i { color: var(--accent); font-size: 1rem; margin-top: 1px; flex-shrink: 0; }
+        .ai-item strong { display: block; color: var(--text-primary); margin-bottom: 2px; font-size: 0.84rem; }
+
+        /* 团队下拉 */
+        .team-panel {
+            min-width: 220px;
+            font-size: 0.83rem;
+            color: var(--text-dim);
+            line-height: 1.8;
+        }
+        .team-panel p { border-bottom: 1px solid rgba(255,255,255,0.05); padding: 6px 0; }
+        .team-panel p:last-child { border-bottom: none; }
+        .team-panel strong { color: var(--text-primary); }
+
+        /* ═══════════════════════════════════════
+           主体 - 左图右卡分屏
+        ═══════════════════════════════════════ */
+        .page-body {
+            display: flex;
+            height: 100vh;
+            padding-top: var(--nav-h);
+        }
+
+        /* ── 左侧图片区域 ── */
+        .hero-side {
+            flex: 1 1 55%;
+            position: relative;
+            overflow: hidden;
+            min-width: 0;
+        }
+
+        /* 足球场地科技感背景图（使用 unsplash + 足球相关 SVG 覆盖） */
+        .hero-bg {
+            position: absolute;
+            inset: 0;
+            background:
+                url('https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1200&auto=format&fit=crop&q=80') center/cover no-repeat;
+            filter: brightness(0.55) saturate(1.2);
+        }
+
+        /* 科技感粒子网格覆盖 */
+        .hero-overlay {
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(135deg, rgba(7,16,32,0.55) 0%, rgba(0,40,20,0.25) 50%, rgba(7,16,32,0.75) 100%),
+                linear-gradient(rgba(0,255,136,0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,255,136,0.04) 1px, transparent 1px);
+            background-size: auto, 36px 36px, 36px 36px;
+        }
+
+        /* 右侧渐变遮罩，使卡片区域无缝衔接 */
+        .hero-fade {
+            position: absolute;
+            top: 0; bottom: 0; right: 0;
+            width: 120px;
+            background: linear-gradient(to right, transparent, var(--bg-dark));
+        }
+
+        /* 左侧文字 */
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            padding: 60px 60px 40px 56px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .hero-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0,255,136,0.12);
+            border: 1px solid rgba(0,255,136,0.30);
+            border-radius: 20px;
+            padding: 5px 14px;
+            font-size: 0.78rem;
+            color: var(--primary);
+            letter-spacing: 1px;
+            margin-bottom: 28px;
+            width: fit-content;
+        }
+        .hero-label span { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--primary); animation: pulse-dot 1.5s infinite; }
+
+        @keyframes pulse-dot {
+            0%,100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.7); }
+        }
+
+        .hero-title {
+            font-size: clamp(1.9rem, 3.2vw, 2.8rem);
+            font-weight: 800;
+            line-height: 1.2;
+            letter-spacing: -0.5px;
+            color: #fff;
+            text-shadow: 0 2px 20px rgba(0,0,0,0.6);
+            margin-bottom: 14px;
+        }
+        .hero-title em {
+            font-style: normal;
+            background: linear-gradient(90deg, #00ff88, #00d4ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-sub {
+            font-size: clamp(0.95rem, 1.4vw, 1.15rem);
+            color: rgba(232,234,246,0.65);
+            line-height: 1.7;
+            max-width: 480px;
+            margin-bottom: 40px;
+        }
+
+        /* 统计数字 */
+        .hero-stats {
+            display: flex;
+            gap: 36px;
+        }
+        .stat-item { text-align: center; }
+        .stat-num {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--primary);
+            line-height: 1;
+        }
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            margin-top: 4px;
+            letter-spacing: 0.5px;
+        }
+
+        /* 光晕装饰 */
+        .hero-glow {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 1;
+        }
+        .hg1 { width: 400px; height: 400px; background: rgba(0,255,136,0.12); bottom: -100px; left: -100px; }
+        .hg2 { width: 300px; height: 300px; background: rgba(0,212,255,0.10); top: 50px; right: 80px; }
+
+        /* ── 右侧登录区域 ── */
+        .login-side {
+            flex: 0 0 420px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px 32px 20px 20px;
+            position: relative;
+            z-index: 10;
+            overflow-y: auto;
+        }
+
+        .login-inner {
+            width: 100%;
+            max-width: 380px;
+        }
+
+        .login-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 28px;
+        }
+        .login-logo img { width: 40px; height: 40px; filter: drop-shadow(0 0 10px rgba(0,255,136,0.5)); }
+        .login-logo h2 {
+            font-size: 1.05rem;
+            background: linear-gradient(135deg, #00ff88, #00cc70);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--bg-border);
+            border-radius: 16px;
+            padding: 30px 28px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,255,136,0.06);
+            backdrop-filter: blur(16px);
+        }
+
+        .tab-bar {
+            display: flex;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            padding: 3px;
+            margin-bottom: 24px;
+        }
+        .tab-btn {
+            flex: 1; padding: 7px 0;
+            background: none; border: none;
+            color: var(--text-dim);
+            font-size: 0.92rem; cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            background: var(--primary);
+            color: #0a0f1e;
+            font-weight: 600;
+        }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group label {
+            display: block;
+            font-size: 0.82rem;
+            color: var(--text-dim);
+            margin-bottom: 7px;
+        }
+        .input-wrap { position: relative; }
+        .input-wrap i {
+            position: absolute; left: 13px; top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-dim); font-size: 0.87rem;
+        }
+        .form-group input {
+            width: 100%;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.10);
+            border-radius: 8px;
+            padding: 11px 13px 11px 38px;
+            color: var(--text-primary);
+            font-size: 0.93rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus { border-color: var(--primary); }
+        .form-group input::placeholder { color: rgba(255,255,255,0.22); }
+        .form-group input.valid { border-color: var(--primary) !important; }
+        .form-group input.invalid { border-color: #ff4c4c !important; }
+
+        .field-hint {
+            font-size: 0.76rem;
+            margin-top: 4px;
+            min-height: 16px;
+            transition: color 0.2s;
+        }
+        .field-hint.ok  { color: var(--primary); }
+        .field-hint.err { color: #ff4c4c; }
+
+        .pwd-strength-bar {
+            height: 3px; border-radius: 2px;
+            margin-top: 5px;
+            background: rgba(255,255,255,0.07);
+            overflow: hidden;
+        }
+        .pwd-strength-fill {
+            height: 100%; border-radius: 2px;
+            width: 0%; transition: width 0.3s, background 0.3s;
+        }
+
+        .form-options {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px; font-size: 0.82rem;
+        }
+        .form-options label { display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-dim); }
+        .form-options a { color: var(--primary); text-decoration: none; }
+        .form-options a:hover { text-decoration: underline; }
+
+        .btn-login {
+            width: 100%; padding: 12px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: #0a0f1e; border: none; border-radius: 8px;
+            font-size: 0.97rem; font-weight: 700; cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,255,136,0.35);
+        }
+        .btn-login:active { transform: translateY(0); }
+
+        .divider {
+            display: flex; align-items: center; gap: 10px;
+            margin: 16px 0; color: var(--text-dim); font-size: 0.82rem;
+        }
+        .divider::before, .divider::after {
+            content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.08);
+        }
+
+        .btn-demo {
+            width: 100%; padding: 11px;
+            background: rgba(0,212,255,0.08);
+            border: 1px solid rgba(0,212,255,0.28);
+            border-radius: 8px; color: var(--accent);
+            font-size: 0.92rem; cursor: pointer;
+            transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-demo:hover { background: rgba(0,212,255,0.16); }
+
+        .alert {
+            padding: 9px 13px; border-radius: 8px;
+            font-size: 0.82rem; margin-bottom: 14px; display: none;
+        }
+        .alert.error { background: rgba(255,76,76,0.1); border: 1px solid rgba(255,76,76,0.3); color: #ff4c4c; }
+        .alert.success { background: rgba(0,255,136,0.1); border: 1px solid rgba(0,255,136,0.3); color: var(--primary); }
+
+        #register-form { display: none; }
+
+        /* 版权 */
+        .copyright-bar {
+            text-align: center;
+            margin-top: 18px;
+            font-size: 0.73rem;
+            color: rgba(255,255,255,0.28);
+            line-height: 1.8;
+        }
+
+        /* 响应式 */
+        @media (max-width: 800px) {
+            .hero-side { display: none; }
+            .login-side { flex: 1; padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ══ 顶部导航栏 ══════════════════════════════════════════ -->
+    <nav class="top-nav">
+        <a class="nav-brand" href="login.html">
+            <img src="logo-football.svg" alt="logo">
+            CoachArgus
+        </a>
+
+        <div class="nav-links">
+            <!-- 登录按钮（左侧导航区，高亮） -->
+            <button class="nav-login-btn" onclick="scrollToLogin()">登录</button>
+
+            <!-- 功能介绍 -->
+            <div class="dropdown-wrap">
+                <button class="nav-btn">功能介绍 <i class="fas fa-chevron-down" style="font-size:0.7rem;margin-left:3px;"></i></button>
+                <div class="dropdown-panel">
+                    <h4><i class="fas fa-star" style="margin-right:6px;"></i>核心功能</h4>
+                    <div class="feat-grid">
+                        <div class="feat-card"><i class="fas fa-crosshairs"></i>多目标追踪</div>
+                        <div class="feat-card"><i class="fas fa-fire"></i>热力图分析</div>
+                        <div class="feat-card"><i class="fas fa-spider"></i>五维雷达图</div>
+                        <div class="feat-card"><i class="fas fa-chart-bar"></i>战术数据统计</div>
+                        <div class="feat-card"><i class="fas fa-map"></i>场地投影映射</div>
+                        <div class="feat-card"><i class="fas fa-users"></i>球员身份识别</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 人工智能应用 -->
+            <div class="dropdown-wrap">
+                <button class="nav-btn">人工智能应用 <i class="fas fa-chevron-down" style="font-size:0.7rem;margin-left:3px;"></i></button>
+                <div class="dropdown-panel ai-panel">
+                    <h4><i class="fas fa-robot" style="margin-right:6px;"></i>AI 技术栈</h4>
+                    <div class="ai-item">
+                        <i class="fas fa-eye"></i>
+                        <div><strong>YOLOv8 目标检测</strong>实时检测球员、裁判与足球位置</div>
+                    </div>
+                    <div class="ai-item">
+                        <i class="fas fa-id-badge"></i>
+                        <div><strong>OSNet 重识别</strong>跨镜头球员身份关联与持续追踪</div>
+                    </div>
+                    <div class="ai-item">
+                        <i class="fas fa-project-diagram"></i>
+                        <div><strong>卡尔曼滤波</strong>轨迹预测与平滑优化</div>
+                    </div>
+                    <div class="ai-item">
+                        <i class="fas fa-th"></i>
+                        <div><strong>单应性矩阵</strong>视频帧到战术板的精准投影</div>
+                    </div>
+                    <div class="ai-item">
+                        <i class="fas fa-comments"></i>
+                        <div><strong>AI 对话助手</strong>自然语言解读分析结果</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 研发团队 -->
+            <div class="dropdown-wrap">
+                <button class="nav-btn">球界无限团队 <i class="fas fa-chevron-down" style="font-size:0.7rem;margin-left:3px;"></i></button>
+                <div class="dropdown-panel team-panel">
+                    <h4><i class="fas fa-university" style="margin-right:6px;"></i>团队信息</h4>
+                    <p><strong>单位：</strong>球界智研工作室</p>
+                    <p><strong>成员：</strong>赤隼 &nbsp;白鸮 &nbsp;苍鸢</p>
+                    <p><strong>版本：</strong>CoachArgus V4.0.0</p>
+                    <p><strong>年份：</strong>2026</p>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ══ 主体 ════════════════════════════════════════════════ -->
+    <div class="page-body">
+
+        <!-- 左侧英雄区域 -->
+        <div class="hero-side">
+            <div class="hero-bg"></div>
+            <div class="hero-overlay"></div>
+            <div class="hero-glow hg1"></div>
+            <div class="hero-glow hg2"></div>
+            <div class="hero-fade"></div>
+
+            <div class="hero-content">
+                <div class="hero-label">
+                    <span></span>
+                    AI 驱动 · 实时分析
+                </div>
+
+                <h1 class="hero-title">
+                    足球智能追踪<br>
+                    <em>与运动评估系统</em>
+                </h1>
+
+                <p class="hero-sub">
+                    基于深度学习的足球比赛视频分析平台，<br>
+                    实现多目标追踪、热力图生成、精彩片段智能剪辑<br>
+                    及 AI 战术对话解读。
+                </p>
+
+                <div class="hero-stats">
+                    <div class="stat-item">
+                        <div class="stat-num">YOLOv8</div>
+                        <div class="stat-label">目标检测引擎</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-num">OSNet</div>
+                        <div class="stat-label">球员重识别</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-num">实时</div>
+                        <div class="stat-label">热力图追踪</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧登录区域 -->
+        <div class="login-side" id="login-section">
+            <div class="login-inner">
+                <div class="login-logo">
+                    <img src="logo-football.svg" alt="logo">
+                    <h2>足球智能追踪与运动评估系统</h2>
+                </div>
+
+                <div class="card">
+                    <div class="tab-bar">
+                        <button class="tab-btn active" id="tab-login" onclick="switchTab('login')">登录</button>
+                        <button class="tab-btn" id="tab-register" onclick="switchTab('register')">注册</button>
+                    </div>
+
+                    <div id="alert-box" class="alert"></div>
+
+                    <!-- 登录表单 -->
+                    <form id="login-form" onsubmit="handleLogin(event)">
+                        <div class="form-group">
+                            <label>用户名 / 邮箱</label>
+                            <div class="input-wrap">
+                                <i class="fas fa-user"></i>
+                                <input type="text" id="login-username" placeholder="请输入用户名或邮箱" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>密码</label>
+                            <div class="input-wrap">
+                                <i class="fas fa-lock"></i>
+                                <input type="password" id="login-password" placeholder="请输入密码" required>
+                            </div>
+                        </div>
+                        <div class="form-options">
+                            <label>
+                                <input type="checkbox" id="remember-me">
+                                记住我
+                            </label>
+                            <a href="#">忘记密码？</a>
+                        </div>
+                        <button type="submit" class="btn-login">
+                            <i class="fas fa-sign-in-alt"></i> 登录
+                        </button>
+                    </form>
+
+                    <!-- 注册表单 -->
+                    <form id="register-form" onsubmit="handleRegister(event)">
+                        <div class="form-group">
+                            <label>用户名</label>
+                            <div class="input-wrap">
+                                <i class="fas fa-user"></i>
+                                <input type="text" id="reg-username" placeholder="请输入用户名（4-20字符）" required
+                                       minlength="4" maxlength="20" oninput="validateUsername(this)">
+                            </div>
+                            <div class="field-hint" id="hint-username"></div>
+                        </div>
+                        <div class="form-group">
+                            <label>邮箱</label>
+                            <div class="input-wrap">
+                                <i class="fas fa-envelope"></i>
+                                <input type="email" id="reg-email" placeholder="请输入邮箱地址" required
+                                       oninput="validateEmail(this)">
+                            </div>
+                            <div class="field-hint" id="hint-email"></div>
+                        </div>
+                        <div class="form-group">
+                            <label>密码</label>
+                            <div class="input-wrap">
+                                <i class="fas fa-lock"></i>
+                                <input type="password" id="reg-password" placeholder="请输入密码（至少8位）" required
+                                       minlength="8" oninput="validatePassword(this)">
+                            </div>
+                            <div class="pwd-strength-bar">
+                                <div class="pwd-strength-fill" id="pwd-strength-fill"></div>
+                            </div>
+                            <div class="field-hint" id="hint-password"></div>
+                        </div>
+                        <div class="form-group">
+                            <label>确认密码</label>
+                            <div class="input-wrap">
+                                <i class="fas fa-lock"></i>
+                                <input type="password" id="reg-confirm" placeholder="请再次输入密码" required
+                                       oninput="validateConfirm(this)">
+                            </div>
+                            <div class="field-hint" id="hint-confirm"></div>
+                        </div>
+                        <button type="submit" class="btn-login" id="reg-submit-btn">
+                            <i class="fas fa-user-plus"></i> 立即注册
+                        </button>
+                    </form>
+
+                    <div class="divider">或</div>
+                    <button class="btn-demo" onclick="guestLogin()">
+                        <i class="fas fa-flask"></i> 游客体验（演示模式）
+                    </button>
+                </div>
+
+                <!-- 版权 -->
+                <div class="copyright-bar">
+                    <p>版权所有 &copy; 赤隼 &nbsp;白鸮 &nbsp;苍鸢</p>
+                    <p>球界智研工作室 &nbsp;&nbsp;2026 &nbsp;V4.0.0</p>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /page-body -->
+
+    <script>
+        function scrollToLogin() {
+            document.getElementById('login-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function switchTab(tab) {
+            document.getElementById('login-form').style.display    = tab === 'login'    ? 'block' : 'none';
+            document.getElementById('register-form').style.display = tab === 'register' ? 'block' : 'none';
+            document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+            document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+            hideAlert();
+        }
+
+        function showAlert(msg, type = 'error') {
+            const el = document.getElementById('alert-box');
+            el.textContent = msg;
+            el.className = 'alert ' + type;
+            el.style.display = 'block';
+        }
+        function hideAlert() {
+            document.getElementById('alert-box').style.display = 'none';
+        }
+
+        // ── 实时字段验证 ──────────────────────────────────────
+        function setFieldState(input, hintId, ok, msg) {
+            const hint = document.getElementById(hintId);
+            if (ok) {
+                input.classList.remove('invalid'); input.classList.add('valid');
+                hint.className = 'field-hint ok'; hint.textContent = msg;
+            } else {
+                input.classList.remove('valid'); input.classList.add('invalid');
+                hint.className = 'field-hint err'; hint.textContent = msg;
+            }
+        }
+
+        function validateUsername(input) {
+            const v = input.value.trim();
+            if (v.length === 0) { input.className = 'form-group input'; document.getElementById('hint-username').textContent = ''; return false; }
+            if (v.length < 4)  { setFieldState(input, 'hint-username', false, '用户名至少4个字符'); return false; }
+            if (v.length > 20) { setFieldState(input, 'hint-username', false, '用户名最多20个字符'); return false; }
+            if (!/^[a-zA-Z0-9_\u4e00-\u9fa5]+$/.test(v)) { setFieldState(input, 'hint-username', false, '只能包含字母、数字、下划线或中文'); return false; }
+            setFieldState(input, 'hint-username', true, '✓ 用户名格式正确'); return true;
+        }
+
+        function validateEmail(input) {
+            const v = input.value.trim();
+            if (v.length === 0) { input.className = 'form-group input'; document.getElementById('hint-email').textContent = ''; return false; }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) { setFieldState(input, 'hint-email', false, '请输入正确的邮箱格式'); return false; }
+            setFieldState(input, 'hint-email', true, '✓ 邮箱格式正确'); return true;
+        }
+
+        function validatePassword(input) {
+            const v = input.value;
+            if (v.length === 0) {
+                input.className = 'form-group input';
+                document.getElementById('hint-password').textContent = '';
+                document.getElementById('pwd-strength-fill').style.width = '0%';
+                return false;
+            }
+            let score = 0;
+            if (v.length >= 8)  score++;
+            if (v.length >= 12) score++;
+            if (/[A-Z]/.test(v)) score++;
+            if (/[0-9]/.test(v)) score++;
+            if (/[^a-zA-Z0-9]/.test(v)) score++;
+            const colors = ['#ff4c4c','#ff9f43','#ffce56','#00d4ff','#00ff88'];
+            const labels = ['非常弱','弱','一般','强','非常强'];
+            const fill = document.getElementById('pwd-strength-fill');
+            fill.style.width = (score * 20) + '%';
+            fill.style.background = colors[score - 1] || colors[0];
+            if (v.length < 8) { setFieldState(input, 'hint-password', false, '密码至少8位'); return false; }
+            setFieldState(input, 'hint-password', true, `密码强度：${labels[score - 1] || '一般'}`);
+            const conf = document.getElementById('reg-confirm');
+            if (conf.value) validateConfirm(conf);
+            return true;
+        }
+
+        function validateConfirm(input) {
+            const v = input.value;
+            if (v.length === 0) { input.className = 'form-group input'; document.getElementById('hint-confirm').textContent = ''; return false; }
+            const pwd = document.getElementById('reg-password').value;
+            if (v !== pwd) { setFieldState(input, 'hint-confirm', false, '两次密码不一致'); return false; }
+            setFieldState(input, 'hint-confirm', true, '✓ 密码一致'); return true;
+        }
+
+        // ── 登录 ──────────────────────────────────────────────
+        async function handleLogin(e) {
+            e.preventDefault();
+            const username = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value;
+
+
+            try {
+                const res = await fetch(`${window.location.origin}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    localStorage.setItem('auth_user', JSON.stringify(data));
+                    showAlert('登录成功，正在跳转..', 'success');
+                    setTimeout(() => { window.location.href = 'index.html'; }, 800);
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    showAlert(err.detail || '用户名或密码错误');
+                }
+            } catch {
+                showAlert('无法连接服务器，请稍后重试');
+            }
+        }
+
+        // ── 注册 ──────────────────────────────────────────────
+        async function handleRegister(e) {
+            e.preventDefault();
+            const unameEl   = document.getElementById('reg-username');
+            const emailEl   = document.getElementById('reg-email');
+            const pwdEl     = document.getElementById('reg-password');
+            const confirmEl = document.getElementById('reg-confirm');
+            const submitBtn = document.getElementById('reg-submit-btn');
+
+            const ok = [
+                validateUsername(unameEl),
+                validateEmail(emailEl),
+                validatePassword(pwdEl),
+                validateConfirm(confirmEl),
+            ].every(Boolean);
+
+            if (!ok) { showAlert('请修正表单中的错误后再提交'); return; }
+
+            const username = unameEl.value.trim();
+            const email    = emailEl.value.trim();
+            const password = pwdEl.value;
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 注册中..';
+            hideAlert();
+
+            try {
+                const res = await fetch(`${window.location.origin}/api/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    showAlert('注册成功！即将跳转到登录页..', 'success');
+                    document.getElementById('login-username').value = username;
+                    setTimeout(() => switchTab('login'), 1500);
+                } else if (res.status === 409) {
+                    const msg = data.detail || '注册失败';
+                    if (msg.includes('用户名')) setFieldState(unameEl, 'hint-username', false, msg);
+                    else if (msg.includes('邮箱')) setFieldState(emailEl, 'hint-email', false, msg);
+                    showAlert(msg);
+                } else {
+                    showAlert(data.detail || '注册失败，请稍后重试');
+                }
+            } catch {
+                showAlert('无法连接到服务器，请确认后端服务已启动（端口 9999）');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> 立即注册';
+            }
+        }
+
+        function guestLogin() {
+            localStorage.setItem('auth_user', JSON.stringify({ username: '游客', role: 'guest' }));
+            window.location.href = 'index.html';
+        }
+
+        // 已登录则直接跳转
+        if (localStorage.getItem('auth_user')) {
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>

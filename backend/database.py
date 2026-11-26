@@ -1,0 +1,133 @@
+from sqlalchemy import create_engine, Column, Integer, String, Float, JSON, ForeignKey, DateTime, Text, Boolean
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+import datetime
+from datetime import timezone, timedelta
+import os
+from path_config import ensure_data_dirs, get_database_url
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 数据库连接配置
+# DB 文件放在用户目录下，避免 backend/ 目录只读权限问题
+# 生产环境可通过环境变量 DATABASE_URL 覆盖（例如 MySQL）
+# ──────────────────────────────────────────────────────────────────────────────
+ensure_data_dirs()
+DATABASE_URL = get_database_url()
+
+Base = declarative_base()
+
+
+class VideoModel(Base):
+    """视频记录表（主表）"""
+    __tablename__ = "videos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    video_uuid = Column(String(255), unique=True, index=True)
+    filename = Column(String(255))
+    # upload_time 是 ORM 字段名，对外 API 统一用 created_at 别名返回
+    upload_time = Column(DateTime, default=datetime.datetime.utcnow)
+    # 视频所有者（登录用户名），用于按账号隔离历史记录
+    owner = Column(String(64), index=True, nullable=True, default=None)
+
+
+class AthleteProfile(Base):
+    """运动员分析档案表（每个视频对应一条）"""
+    __tablename__ = "athlete_profiles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    video_id = Column(Integer, ForeignKey("videos.id"), index=True)
+    overall_score = Column(Float)
+    decision_summary = Column(String(1000))
+    # 运动员详细分析数据（路线、球位置、多球员数据等）
+    detailed_analysis = Column(JSON)
+
+
+# ── PostureData 表已于 2026-02 移除 ──────────────────────────────────────────
+# 原因：该表在整个业务代码中从未被引用（仅在 database.py 中定义），
+#       且 init.sql 中对应字段与 ORM 不一致，属于废弃冗余表。
+#       数据库中若已存在 posture_data 表不会影响系统运行（SQLAlchemy 不会
+#       自动删除不在 metadata 中的表），如需彻底清除可手动执行：
+#         DROP TABLE IF EXISTS posture_data;
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class UserModel(Base):
+    """
+    用户账号持久化表
+
+    替代原来的内存字典 _users_store，解决以下问题：
+      1. 服务重启后注册用户数据丢失
+      2. 无法实现邮箱唯一性约束
+      3. 无法在管理后台持久化查询用户列表
+
+    字段说明：
+      username      — 登录用户名（唯一）
+      email         — 邮箱地址（唯一，用于邮箱登录）
+      password_hash — SHA256 哈希后的密码
+      role          — 'admin' | 'user'
+      created_at    — 注册时间（UTC）
+      is_active     — 是否启用（软删除预留）
+    """
+    __tablename__ = "users"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    username      = Column(String(64), unique=True, index=True, nullable=False)
+    email         = Column(String(255), unique=True, index=True, nullable=False)
+    password_hash = Column(String(128), nullable=False)
+    role          = Column(String(16), default="user", nullable=False)
+    created_at    = Column(DateTime, default=datetime.datetime.utcnow)
+    is_active     = Column(Boolean, default=True, nullable=False)
+
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
+)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+# ── 时区转换辅助函数 ──────────────────────────────────────────────────────────
+
+def to_beijing_time(utc_datetime):
+    """将 UTC datetime 转换为北京时间 (UTC+8)"""
+    if utc_datetime is None:
+        return None
+    if utc_datetime.tzinfo is None:
+        utc_datetime = utc_datetime.replace(tzinfo=timezone.utc)
+    beijing_tz = timezone(timedelta(hours=8))
+    return utc_datetime.astimezone(beijing_tz)
+
+
+def init_db():
+    """创建所有在 metadata 中注册的表（含新增的 ai_chat_sessions / ai_video_cache / users）"""
+    Base.metadata.create_all(bind=engine)
+
+    # 兼容性迁移：为旧版 videos 表补充 owner 列（SQLite 不支持 ALTER TABLE ADD COLUMN IF NOT EXISTS）
+    try:
+        with engine.connect() as conn:
+            # 检查 owner 列是否已存在
+            result = conn.execute(
+                __import__('sqlalchemy').text("PRAGMA table_info(videos)")
+            )
+            columns = [row[1] for row in result]
+            if "owner" not in columns:
+                conn.execute(
+                    __import__('sqlalchemy').text(
+                        "ALTER TABLE videos ADD COLUMN owner VARCHAR(64) DEFAULT NULL"
+                    )
+                )
+                conn.commit()
+                print("[DB_MIGRATE] Added 'owner' column to videos table")
+    except Exception as e:
+        print(f"[DB_MIGRATE] Migration warning (non-fatal): {e}")
+
+
+def get_db():
+    """FastAPI 依赖注入：提供数据库 Session"""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

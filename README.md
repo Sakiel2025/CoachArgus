@@ -12,4 +12,24 @@ CoachArgus 是我们团队共同开发的 [GoalScope 足球视频分析系统](h
 
 共享系统由 GoalScope 团队共同开发。原项目及其公开记录见 [EVANDRAUGHT/football-game](https://github.com/EVANDRAUGHT/football-game)。
 
-本仓库目前仅包含项目说明。源码、模型权重以及各自的许可证和来源说明将在确认发布范围后补充。
+本仓库发布源码。AI 对话集成、模型文件、历史数据库、视频和缓存均已移除。仓库目前未添加统一许可证。
+
+## 本地运行
+
+使用 Python 3.9 或 3.10。建议在虚拟环境中执行以下命令：
+
+```shell
+python -m pip install -r backend/requirements.txt
+python -m uvicorn --app-dir backend main:app --host 127.0.0.1 --port 9999
+```
+
+打开 http://127.0.0.1:9999，可注册或使用游客入口。需要管理后台时，在首次启动前通过环境变量设置 `COACHARGUS_ADMIN_PASSWORD`（至少 12 个字符）。本项目按本地使用配置。
+
+### 自备模型
+
+- 球员检测需要兼容的 `best.pt`，放在仓库根目录。
+- 专用足球检测权重文件名为 `football-ball-detection.pt`。
+- 深度重识别需单独安装兼容的 Torchreid 并配置 `osnet_x075_soccernet_best.pth`。
+- 球场分割需配置 `soccer_pitch_segmentation.pth`、`mean.npy` 和 `std.npy`。缺少分割模型时使用降级路径。
+
+按各模型提供方的许可自行获取权重。

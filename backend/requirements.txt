@@ -1,0 +1,49 @@
+# ============================================
+#  Football Analysis AI System - Dependencies
+# ============================================
+
+# Web Framework
+fastapi==0.104.1
+uvicorn==0.24.0
+python-multipart==0.0.6
+pydantic==2.5.2
+aiofiles==23.2.1
+
+# Video Processing & Analysis
+opencv-python==4.8.1.78
+numpy==1.24.3
+ultralytics==8.4.24
+imageio-ffmpeg==0.4.9
+pillow==10.1.0
+scikit-learn>=1.3.0
+scipy>=1.10.0
+
+# Player Re-Identification (ReID)
+# Optional: install a compatible torchvision and Torchreid for deep ReID.
+
+# OCR Engines: NOT required.
+# Jersey number recognition is handled via frontend manual annotation dialog.
+# The main analysis pipeline (analysis.py) consumes jersey_annotations from the frontend.
+# EasyOCR and PaddleOCR have both been removed. jersey_number_recognition.py is a stub only.
+
+# Database
+# greenlet is only needed for SQLAlchemy async mode; this project uses sync SQLite only.
+# Pinning sqlalchemy[sync] avoids pulling in greenlet (which requires MSVC to compile on Windows).
+sqlalchemy==2.0.23
+greenlet==3.1.1  ; sys_platform != "win32"  # skip on Windows to avoid MSVC compile error
+
+# HTTP Client
+# Note: If adbutils or uiautomator2 is already installed, version conflict warnings may appear.
+# Solution: Run fix_dependencies.bat to auto-fix.
+requests>=2.28.0
+
+# Async Support
+httpx>=0.24.0
+
+# Optional Utilities
+gdown>=4.7.1           # auto-download model weights from Google Drive
+umap-learn>=0.5.3      # dimensionality reduction for ReID clustering (PCA fallback is used if not installed)
+
+# Torch (install manually from local .whl if CUDA is needed)
+# torch==2.6.0+cu124  -- install via: pip install torch --index-url https://download.pytorch.org/whl/cu124
+# torchvision==0.21.0+cu124  -- use the bundled .whl in the project root
